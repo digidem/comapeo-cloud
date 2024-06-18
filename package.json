@@ -6,7 +6,8 @@
   "type": "module",
   "scripts": {
     "format": "prettier --write .",
-    "test:prettier": "prettier --check ."
+    "test:prettier": "prettier --check .",
+    "test:eslint": "eslint ."
   },
   "repository": {
     "type": "git",
@@ -19,6 +20,9 @@
   },
   "homepage": "https://github.com/digidem/mapeo-cloud#readme",
   "devDependencies": {
+    "@eslint/js": "^9.5.0",
+    "eslint": "^9.5.0",
+    "globals": "^15.6.0",
     "prettier": "^3.3.2"
   }
 }
