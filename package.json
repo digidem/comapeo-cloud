@@ -2,13 +2,15 @@
   "name": "mapeo-cloud",
   "version": "0.0.0",
   "description": "",
-  "main": "index.js",
+  "main": "src/main.js",
   "type": "module",
   "scripts": {
     "format": "prettier --write .",
     "test:prettier": "prettier --check .",
     "test:eslint": "eslint .",
-    "test": "npm-run-all --aggregate-output --print-label --parallel test:*"
+    "test:typescript": "tsc",
+    "test": "npm-run-all --aggregate-output --print-label --parallel test:*",
+    "watch:typescript": "tsc --watch"
   },
   "repository": {
     "type": "git",
@@ -26,6 +28,7 @@
     "eslint": "^9.5.0",
     "globals": "^15.6.0",
     "npm-run-all": "^4.1.5",
-    "prettier": "^3.3.2"
+    "prettier": "^3.3.2",
+    "typescript": "^5.4.5"
   }
 }

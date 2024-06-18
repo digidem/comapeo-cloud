@@ -1,7 +1,2 @@
-.DS_Store
-node_modules
-*.log
-.tmp
-tmp
-keypair.json
-.env
+/node_modules/
+/*.tsbuildinfo
