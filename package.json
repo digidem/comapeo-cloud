@@ -1,23 +1,24 @@
 {
-	"name": "mapeo-cloud",
-	"version": "0.0.0",
-	"description": "",
-	"main": "index.js",
-	"type": "module",
-	"scripts": {
-	},
-	"repository": {
-		"type": "git",
-		"url": "git+https://github.com/digidem/mapeo-cloud.git"
-	},
-	"author": "Digital Democracy",
-	"license": "MIT",
-	"bugs": {
-		"url": "https://github.com/digidem/mapeo-cloud/issues"
-	},
-	"homepage": "https://github.com/digidem/mapeo-cloud#readme",
-	"dependencies": {
-	},
-	"devDependencies": {
-	}
+  "name": "mapeo-cloud",
+  "version": "0.0.0",
+  "description": "",
+  "main": "index.js",
+  "type": "module",
+  "scripts": {
+    "format": "prettier --write .",
+    "test:prettier": "prettier --check ."
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/digidem/mapeo-cloud.git"
+  },
+  "author": "Digital Democracy",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/digidem/mapeo-cloud/issues"
+  },
+  "homepage": "https://github.com/digidem/mapeo-cloud#readme",
+  "devDependencies": {
+    "prettier": "^3.3.2"
+  }
 }
