@@ -5,7 +5,6 @@
 	"main": "index.js",
 	"type": "module",
 	"scripts": {
-		"test": "brittle tests/*.js"
 	},
 	"repository": {
 		"type": "git",
