@@ -13,7 +13,8 @@
     "test:eslint": "eslint .",
     "test:typescript": "tsc",
     "test": "npm-run-all --aggregate-output --print-label --parallel test:*",
-    "watch:typescript": "tsc --watch"
+    "watch:typescript": "tsc --watch",
+    "prepare": "husky"
   },
   "repository": {
     "type": "git",
@@ -31,6 +32,8 @@
     "@types/node": "^20.14.6",
     "eslint": "^9.5.0",
     "globals": "^15.6.0",
+    "husky": "^9.0.11",
+    "lint-staged": "^15.2.7",
     "npm-run-all": "^4.1.5",
     "prettier": "^3.3.2",
     "random-access-memory": "^6.2.1",
