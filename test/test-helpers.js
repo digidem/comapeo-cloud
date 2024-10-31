@@ -43,7 +43,7 @@ export function getManagerOptions() {
 /**
  * @param {TestContext} t
  * @param {Partial<ServerOptions>} [serverOptions]
- * @returns {import('fastify').FastifyInstance & { deviceId: string }}
+ * @returns {FastifyInstance & { deviceId: string }}
  */
 export function createTestServer(t, serverOptions) {
   const managerOptions = getManagerOptions()
@@ -63,3 +63,18 @@ export function createTestServer(t, serverOptions) {
   // @ts-expect-error
   return server
 }
+
+export const randomHex = (length = 32) =>
+  Buffer.from(randomBytes(length)).toString('hex')
+
+export const randomAddProjectBody = () => ({
+  projectName: randomHex(16),
+  projectKey: randomHex(),
+  encryptionKeys: {
+    auth: randomHex(),
+    config: randomHex(),
+    data: randomHex(),
+    blobIndex: randomHex(),
+    blob: randomHex(),
+  },
+})

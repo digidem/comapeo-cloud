@@ -41,9 +41,11 @@
     "typescript": "^5.6.3"
   },
   "dependencies": {
-    "@comapeo/core": "^2.0.1",
+    "@comapeo/core": "file:comapeo-core-2.0.1.tgz",
     "@fastify/sensible": "^5.6.0",
+    "@mapeo/crypto": "^1.0.0-alpha.10",
     "@sinclair/typebox": "^0.33.17",
-    "fastify": "^4.28.1"
+    "fastify": "^4.28.1",
+    "string-timing-safe-equal": "^0.1.0"
   }
 }

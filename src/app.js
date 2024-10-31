@@ -1,6 +1,8 @@
 import fastifySensible from '@fastify/sensible'
 import createFastifyPlugin from 'fastify-plugin'
 
+import allowedHostsPlugin from './allowed-hosts-plugin.js'
+import baseUrlPlugin from './base-url-plugin.js'
 import comapeoPlugin from './comapeo-plugin.js'
 import routes from './routes.js'
 
@@ -9,22 +11,35 @@ import routes from './routes.js'
 /** @import { RouteOptions } from './routes.js' */
 
 /**
- * @typedef {ComapeoPluginOptions & RouteOptions} ServerOptions
+ * @internal
+ * @typedef {object} OtherServerOptions
+ * @prop {string[]} [allowedHosts]
+ */
+
+/**
+ * @typedef {ComapeoPluginOptions & OtherServerOptions & RouteOptions} ServerOptions
  */
 
 /** @type {FastifyPluginAsync<ServerOptions>} */
-function comapeoServer(
+async function comapeoServer(
   fastify,
-  { serverBearerToken, serverName, ...comapeoPluginOpts },
+  {
+    serverBearerToken,
+    serverName,
+    allowedHosts,
+    allowedProjects,
+    ...comapeoPluginOpts
+  },
 ) {
   fastify.register(fastifySensible, { sharedSchemaId: 'HttpError' })
+  fastify.register(allowedHostsPlugin, { allowedHosts })
+  fastify.register(baseUrlPlugin)
   fastify.register(comapeoPlugin, comapeoPluginOpts)
   fastify.register(routes, {
     serverBearerToken,
     serverName,
+    allowedProjects,
   })
-
-  return Promise.resolve()
 }
 
 export default createFastifyPlugin(comapeoServer, {

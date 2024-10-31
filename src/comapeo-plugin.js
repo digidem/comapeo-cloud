@@ -8,11 +8,9 @@ import createFastifyPlugin from 'fastify-plugin'
  */
 
 /** @type {FastifyPluginAsync<ComapeoPluginOptions>} */
-const comapeoPlugin = (fastify, opts) => {
+const comapeoPlugin = async (fastify, opts) => {
   const comapeo = new MapeoManager({ ...opts, fastify })
   fastify.decorate('comapeo', comapeo)
-
-  return Promise.resolve()
 }
 
 export default createFastifyPlugin(comapeoPlugin, { name: 'comapeo' })

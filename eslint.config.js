@@ -83,7 +83,6 @@ export default [
       'prefer-spread': 'error',
       radix: 'error',
       'require-atomic-updates': 'error',
-      'require-await': 'error',
       'require-unicode-regexp': 'error',
       strict: 'error',
       'symbol-description': 'error',
