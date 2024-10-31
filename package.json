@@ -16,7 +16,7 @@
     "test:node": "node --test",
     "test": "npm-run-all --aggregate-output --print-label --parallel test:*",
     "watch:typescript": "tsc --watch",
-    "prepare": "husky"
+    "prepare": "husky || true"
   },
   "repository": {
     "type": "git",
