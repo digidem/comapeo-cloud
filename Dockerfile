@@ -7,8 +7,6 @@ FROM node:${NODE_VERSION} AS build
 RUN apt-get update && apt-get install -y --no-install-recommends dumb-init
 WORKDIR /usr/src/app
 COPY package*.json /usr/src/app/
-# TODO: Remove when package is published
-COPY comapeo-core-2.0.1.tgz /usr/src/app/
 RUN npm ci --omit=dev
 
 # --------------> The production image__

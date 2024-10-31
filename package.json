@@ -62,7 +62,7 @@
     "typescript": "^5.6.3"
   },
   "dependencies": {
-    "@comapeo/core": "file:comapeo-core-2.0.1.tgz",
+    "@comapeo/core": "^2.1.0",
     "@fastify/sensible": "^5.6.0",
     "@fastify/websocket": "^10.0.1",
     "@mapeo/crypto": "^1.0.0-alpha.10",
