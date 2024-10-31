@@ -7,16 +7,31 @@
     "mapeo-server": "src/bin/mapeo-server.js"
   },
   "type": "module",
+  "files": [
+    "Dockerfile",
+    "fly.toml",
+    "src/**/*.js",
+    "dist/**/*.d.ts",
+    "comapeo-core-2.0.1.tgz"
+  ],
+  "exports": {
+    "types": "./dist/app.d.ts",
+    "import": "./src/app.js"
+  },
   "scripts": {
     "start": "node src/server.js",
+    "build:clean": "rm -rf dist",
+    "build:typescript": "tsc --project ./tsconfig.build.json",
+    "build": "npm-run-all --serial build:clean build:typescript",
     "format": "prettier --write .",
     "test:prettier": "prettier --check .",
     "test:eslint": "eslint .",
-    "test:typescript": "tsc",
+    "test:typescript": "tsc --project ./tsconfig.dev.json",
     "test:node": "node --test",
     "test": "npm-run-all --aggregate-output --print-label --parallel test:*",
-    "watch:typescript": "tsc --watch",
-    "prepare": "husky || true"
+    "watch:typescript": "tsc --watch --project ./tsconfig.dev.json",
+    "prepare": "husky || true",
+    "prepack": "npm run build"
   },
   "repository": {
     "type": "git",
