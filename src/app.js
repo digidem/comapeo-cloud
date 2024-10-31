@@ -1,4 +1,5 @@
 import fastifySensible from '@fastify/sensible'
+import fastifyWebsocket from '@fastify/websocket'
 import createFastifyPlugin from 'fastify-plugin'
 
 import allowedHostsPlugin from './allowed-hosts-plugin.js'
@@ -31,6 +32,7 @@ async function comapeoServer(
     ...comapeoPluginOpts
   },
 ) {
+  fastify.register(fastifyWebsocket)
   fastify.register(fastifySensible, { sharedSchemaId: 'HttpError' })
   fastify.register(allowedHostsPlugin, { allowedHosts })
   fastify.register(baseUrlPlugin)

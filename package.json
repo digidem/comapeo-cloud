@@ -28,24 +28,31 @@
   },
   "homepage": "https://github.com/digidem/comapeo-cloud#readme",
   "devDependencies": {
+    "@comapeo/schema": "^1.2.0",
     "@eslint/js": "^9.13.0",
+    "@mapeo/mock-data": "^2.1.1",
     "@trivago/prettier-plugin-sort-imports": "^4.3.0",
     "@types/node": "^22.8.4",
+    "@types/ws": "^8.5.12",
     "eslint": "^9.13.0",
     "globals": "^15.11.0",
     "husky": "^9.1.6",
+    "iterpal": "^0.4.0",
     "lint-staged": "^15.2.10",
     "npm-run-all": "^4.1.5",
     "prettier": "^3.3.3",
     "random-access-memory": "^6.2.1",
+    "streamx": "^2.20.1",
     "typescript": "^5.6.3"
   },
   "dependencies": {
     "@comapeo/core": "file:comapeo-core-2.0.1.tgz",
     "@fastify/sensible": "^5.6.0",
+    "@fastify/websocket": "^10.0.1",
     "@mapeo/crypto": "^1.0.0-alpha.10",
     "@sinclair/typebox": "^0.33.17",
     "fastify": "^4.28.1",
-    "string-timing-safe-equal": "^0.1.0"
+    "string-timing-safe-equal": "^0.1.0",
+    "ws": "^8.18.0"
   }
 }

@@ -1,9 +1,12 @@
+import { replicateProject } from '@comapeo/core'
 import { keyToPublicId as projectKeyToPublicId } from '@mapeo/crypto'
 import { Type } from '@sinclair/typebox'
 import timingSafeEqual from 'string-timing-safe-equal'
 
 import assert from 'node:assert/strict'
 import * as fs from 'node:fs'
+
+import { wsCoreReplicator } from './ws-core-replicator.js'
 
 /** @import { FastifyInstance, FastifyPluginAsync, FastifyRequest, RawServerDefault } from 'fastify' */
 /** @import { TypeBoxTypeProvider } from '@fastify/type-provider-typebox' */
@@ -12,6 +15,8 @@ const BEARER_SPACE_LENGTH = 'Bearer '.length
 
 const HEX_REGEX_32_BYTES = '^[0-9a-fA-F]{64}$'
 const HEX_STRING_32_BYTES = Type.String({ pattern: HEX_REGEX_32_BYTES })
+const BASE32_REGEX_32_BYTES = '^[0-9A-Za-z]{52}$'
+const BASE32_STRING_32_BYTES = Type.String({ pattern: BASE32_REGEX_32_BYTES })
 
 const INDEX_HTML_PATH = new URL('./static/index.html', import.meta.url)
 
@@ -219,6 +224,171 @@ export default async function routes(
       }
     },
   )
+
+  fastify.get(
+    '/sync/:projectPublicId',
+    {
+      schema: {
+        params: Type.Object({
+          projectPublicId: BASE32_STRING_32_BYTES,
+        }),
+        response: {
+          404: { $ref: 'HttpError' },
+        },
+      },
+      async preHandler(req) {
+        await ensureProjectExists(this, req)
+      },
+      websocket: true,
+    },
+    /**
+     * @this {FastifyInstance}
+     */
+    async function (socket, req) {
+      // The preValidation hook ensures that the project exists
+      const project = await this.comapeo.getProject(req.params.projectPublicId)
+      const replicationStream = replicateProject(project, false)
+      wsCoreReplicator(socket, replicationStream)
+      project.$sync.start()
+    },
+  )
+
+  fastify.get(
+    '/projects/:projectPublicId/observations',
+    {
+      schema: {
+        params: Type.Object({
+          projectPublicId: BASE32_STRING_32_BYTES,
+        }),
+        response: {
+          200: Type.Object({
+            data: Type.Array(
+              Type.Object({
+                docId: Type.String(),
+                createdAt: Type.String(),
+                updatedAt: Type.String(),
+                deleted: Type.Boolean(),
+                lat: Type.Optional(Type.Number()),
+                lon: Type.Optional(Type.Number()),
+                attachments: Type.Array(
+                  Type.Object({
+                    url: Type.String(),
+                  }),
+                ),
+                tags: Type.Record(
+                  Type.String(),
+                  Type.Union([
+                    Type.Boolean(),
+                    Type.Number(),
+                    Type.String(),
+                    Type.Null(),
+                    Type.Array(
+                      Type.Union([
+                        Type.Boolean(),
+                        Type.Number(),
+                        Type.String(),
+                        Type.Null(),
+                      ]),
+                    ),
+                  ]),
+                ),
+              }),
+            ),
+          }),
+          403: { $ref: 'HttpError' },
+          404: { $ref: 'HttpError' },
+        },
+      },
+      async preHandler(req) {
+        verifyBearerAuth(req)
+        await ensureProjectExists(this, req)
+      },
+    },
+    /**
+     * @this {FastifyInstance}
+     */
+    async function (req) {
+      const { projectPublicId } = req.params
+      const project = await this.comapeo.getProject(projectPublicId)
+
+      return {
+        data: (await project.observation.getMany({ includeDeleted: true })).map(
+          (obs) => ({
+            docId: obs.docId,
+            createdAt: obs.createdAt,
+            updatedAt: obs.updatedAt,
+            deleted: obs.deleted,
+            lat: obs.lat,
+            lon: obs.lon,
+            attachments: obs.attachments
+              // TODO: For now, only photos are supported.
+              // See <https://github.com/digidem/comapeo-cloud/issues/25>.
+              .filter((attachment) => attachment.type === 'photo')
+              .map((attachment) => ({
+                url: new URL(
+                  `projects/${projectPublicId}/attachments/${attachment.driveDiscoveryId}/${attachment.type}/${attachment.name}`,
+                  req.baseUrl,
+                ).href,
+              })),
+            tags: obs.tags,
+          }),
+        ),
+      }
+    },
+  )
+
+  fastify.get(
+    '/projects/:projectPublicId/attachments/:driveDiscoveryId/:type/:name',
+    {
+      schema: {
+        params: Type.Object({
+          projectPublicId: BASE32_STRING_32_BYTES,
+          driveDiscoveryId: Type.String(),
+          // TODO: For now, only photos are supported.
+          // See <https://github.com/digidem/comapeo-cloud/issues/25>.
+          type: Type.Literal('photo'),
+          name: Type.String(),
+        }),
+        querystring: Type.Object({
+          variant: Type.Optional(
+            Type.Union([
+              Type.Literal('original'),
+              Type.Literal('preview'),
+              Type.Literal('thumbnail'),
+            ]),
+          ),
+        }),
+        response: {
+          403: { $ref: 'HttpError' },
+          404: { $ref: 'HttpError' },
+        },
+      },
+      async preHandler(req) {
+        verifyBearerAuth(req)
+        await ensureProjectExists(this, req)
+      },
+    },
+    /**
+     * @this {FastifyInstance}
+     */
+    async function (req, reply) {
+      const project = await this.comapeo.getProject(req.params.projectPublicId)
+
+      const blobUrl = await project.$blobs.getUrl({
+        driveId: req.params.driveDiscoveryId,
+        name: req.params.name,
+        type: req.params.type,
+        variant: req.query.variant || 'original',
+      })
+
+      const proxiedResponse = await fetch(blobUrl)
+      reply.code(proxiedResponse.status)
+      for (const [headerName, headerValue] of proxiedResponse.headers) {
+        reply.header(headerName, headerValue)
+      }
+      return reply.send(proxiedResponse.body)
+    },
+  )
 }
 
 /**
@@ -236,4 +406,22 @@ function isBearerTokenValid(headerValue = '', expectedBearerToken) {
   const actualBearerToken = headerValue.slice(BEARER_SPACE_LENGTH)
 
   return timingSafeEqual(actualBearerToken, expectedBearerToken)
+}
+
+/**
+ * @param {FastifyInstance} fastify
+ * @param {object} req
+ * @param {object} req.params
+ * @param {string} req.params.projectPublicId
+ * @returns {Promise<void>}
+ */
+async function ensureProjectExists(fastify, req) {
+  try {
+    await fastify.comapeo.getProject(req.params.projectPublicId)
+  } catch (e) {
+    if (e instanceof Error && e.message.startsWith('NotFound')) {
+      throw fastify.httpErrors.notFound('Project not found')
+    }
+    throw e
+  }
 }
