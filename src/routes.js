@@ -5,8 +5,10 @@ import timingSafeEqual from 'string-timing-safe-equal'
 import assert from 'node:assert/strict'
 import * as fs from 'node:fs'
 
-/** @import { FastifyInstance, FastifyPluginAsync, RawServerDefault } from 'fastify' */
+/** @import { FastifyInstance, FastifyPluginAsync, FastifyRequest, RawServerDefault } from 'fastify' */
 /** @import { TypeBoxTypeProvider } from '@fastify/type-provider-typebox' */
+
+const BEARER_SPACE_LENGTH = 'Bearer '.length
 
 const HEX_REGEX_32_BYTES = '^[0-9a-fA-F]{64}$'
 const HEX_STRING_32_BYTES = Type.String({ pattern: HEX_REGEX_32_BYTES })
@@ -23,12 +25,21 @@ const INDEX_HTML_PATH = new URL('./static/index.html', import.meta.url)
 /** @type {FastifyPluginAsync<RouteOptions, RawServerDefault, TypeBoxTypeProvider>} */
 export default async function routes(
   fastify,
-  { serverName, allowedProjects = 1 },
+  { serverBearerToken, serverName, allowedProjects = 1 },
 ) {
   /** @type {Set<string> | number} */
   const allowedProjectsSetOrNumber = Array.isArray(allowedProjects)
     ? new Set(allowedProjects)
     : allowedProjects
+
+  /**
+   * @param {FastifyRequest} req
+   */
+  const verifyBearerAuth = (req) => {
+    if (!isBearerTokenValid(req.headers.authorization, serverBearerToken)) {
+      throw fastify.httpErrors.forbidden('Invalid bearer token')
+    }
+  }
 
   fastify.get('/', (_req, reply) => {
     const stream = fs.createReadStream(INDEX_HTML_PATH)
@@ -58,6 +69,40 @@ export default async function routes(
       const { deviceId, name } = this.comapeo.getDeviceInfo()
       return {
         data: { deviceId, name: name || serverName },
+      }
+    },
+  )
+
+  fastify.get(
+    '/projects',
+    {
+      schema: {
+        response: {
+          200: Type.Object({
+            data: Type.Array(
+              Type.Object({
+                projectId: Type.String(),
+                name: Type.String(),
+              }),
+            ),
+          }),
+          403: { $ref: 'HttpError' },
+        },
+      },
+      async preHandler(req) {
+        verifyBearerAuth(req)
+      },
+    },
+    /**
+     * @this {FastifyInstance}
+     */
+    async function () {
+      const projects = await this.comapeo.listProjects()
+      return {
+        data: projects.map((project) => ({
+          projectId: project.projectId,
+          name: project.name,
+        })),
       }
     },
   )
@@ -174,4 +219,21 @@ export default async function routes(
       }
     },
   )
+}
+
+/**
+ * @param {undefined | string} headerValue
+ * @param {string} expectedBearerToken
+ * @returns {boolean}
+ */
+function isBearerTokenValid(headerValue = '', expectedBearerToken) {
+  // This check is not strictly required for correctness, but helps protect
+  // against long values.
+  const expectedLength = BEARER_SPACE_LENGTH + expectedBearerToken.length
+  if (headerValue.length !== expectedLength) return false
+
+  if (!headerValue.startsWith('Bearer ')) return false
+  const actualBearerToken = headerValue.slice(BEARER_SPACE_LENGTH)
+
+  return timingSafeEqual(actualBearerToken, expectedBearerToken)
 }
