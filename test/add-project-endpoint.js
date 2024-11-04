@@ -5,6 +5,7 @@ import test from 'node:test'
 
 import {
   createTestServer,
+  omit,
   randomAddProjectBody,
   randomHex,
 } from './test-helpers.js'
@@ -210,16 +211,3 @@ test('adding the same project twice is idempotent', async (t) => {
   })
   assert.equal(secondResponse.statusCode, 200)
 })
-
-/**
- * @template {object} T
- * @template {keyof T} K
- * @param {T} obj
- * @param {K} key
- * @returns {Omit<T, K>}
- */
-function omit(obj, key) {
-  const result = { ...obj }
-  delete result[key]
-  return result
-}

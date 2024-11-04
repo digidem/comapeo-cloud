@@ -1,8 +1,12 @@
-import { KeyManager } from '@mapeo/crypto'
+import {
+  KeyManager,
+  keyToPublicId as projectKeyToPublicId,
+} from '@mapeo/crypto'
 import createFastify from 'fastify'
 import RAM from 'random-access-memory'
 
 import { randomBytes } from 'node:crypto'
+import { setTimeout as delay } from 'node:timers/promises'
 
 import comapeoServer from '../src/app.js'
 
@@ -78,3 +82,35 @@ export const randomAddProjectBody = () => ({
     blob: randomHex(),
   },
 })
+
+export const randomProjectPublicId = () => projectKeyToPublicId(randomBytes(32))
+
+/**
+ * @template {object} T
+ * @template {keyof T} K
+ * @param {T} obj
+ * @param {K} key
+ * @returns {Omit<T, K>}
+ */
+export function omit(obj, key) {
+  const result = { ...obj }
+  delete result[key]
+  return result
+}
+
+/**
+ * @template T
+ * @param {number} retries
+ * @param {() => Promise<T>} fn
+ * @returns {Promise<T>}
+ */
+export async function runWithRetries(retries, fn) {
+  for (let i = 0; i < retries - 1; i++) {
+    try {
+      return await fn()
+    } catch {
+      await delay(500)
+    }
+  }
+  return fn()
+}

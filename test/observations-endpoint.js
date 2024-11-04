@@ -7,13 +7,14 @@ import { map } from 'iterpal'
 import assert from 'node:assert/strict'
 import * as fs from 'node:fs/promises'
 import test from 'node:test'
-import { setTimeout as delay } from 'node:timers/promises'
 
 import {
   BEARER_TOKEN,
   createTestServer,
   getManagerOptions,
   randomAddProjectBody,
+  randomProjectPublicId,
+  runWithRetries,
 } from './test-helpers.js'
 
 /** @import { ObservationValue } from '@comapeo/schema'*/
@@ -167,12 +168,6 @@ test('returning observations with fetchable attachments', async (t) => {
   )
 })
 
-function randomProjectPublicId() {
-  return projectKeyToPublicId(
-    Buffer.from(randomAddProjectBody().projectKey, 'hex'),
-  )
-}
-
 function generateObservation() {
   const observationDoc = generate('observation')[0]
   assert(observationDoc)
@@ -193,23 +188,6 @@ function blobToAttachment(blob) {
     name: blob.name,
     hash: blob.hash,
   }
-}
-
-/**
- * @template T
- * @param {number} retries
- * @param {() => Promise<T>} fn
- * @returns {Promise<T>}
- */
-async function runWithRetries(retries, fn) {
-  for (let i = 0; i < retries - 1; i++) {
-    try {
-      return await fn()
-    } catch {
-      await delay(500)
-    }
-  }
-  return fn()
 }
 
 /**

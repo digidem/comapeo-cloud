@@ -44,3 +44,25 @@ export const observationResult = Type.Object({
     ]),
   ),
 })
+
+export const remoteDetectionAlertToAdd = Type.Object({
+  detectionDateStart: dateTimeString,
+  detectionDateEnd: dateTimeString,
+  sourceId: Type.String({ minLength: 1 }),
+  metadata: Type.Record(
+    Type.String(),
+    Type.Union([
+      Type.Boolean(),
+      Type.Number(),
+      Type.String(),
+      Type.Null(),
+      Type.Array(
+        Type.Union([Type.Boolean(), Type.Number(), Type.String(), Type.Null()]),
+      ),
+    ]),
+  ),
+  geometry: Type.Object({
+    type: Type.Literal('Point'),
+    coordinates: Type.Tuple([longitude, latitude]),
+  }),
+})
