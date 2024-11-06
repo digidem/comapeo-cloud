@@ -26,4 +26,5 @@ test('disallowed host', async (t) => {
   })
 
   assert.equal(response.statusCode, 403)
+  assert.equal(response.json().error.code, 'FORBIDDEN')
 })

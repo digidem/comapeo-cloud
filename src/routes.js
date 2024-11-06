@@ -5,7 +5,9 @@ import timingSafeEqual from 'string-timing-safe-equal'
 
 import assert from 'node:assert/strict'
 import * as fs from 'node:fs'
+import { STATUS_CODES } from 'node:http'
 
+import * as errors from './errors.js'
 import * as schemas from './schemas.js'
 import { wsCoreReplicator } from './ws-core-replicator.js'
 
@@ -41,9 +43,31 @@ export default async function routes(
    */
   const verifyBearerAuth = (req) => {
     if (!isBearerTokenValid(req.headers.authorization, serverBearerToken)) {
-      throw fastify.httpErrors.forbidden('Invalid bearer token')
+      throw errors.invalidBearerToken()
     }
   }
+
+  fastify.setErrorHandler((error, _req, reply) => {
+    /** @type {number} */
+    let statusCode = error.statusCode || 500
+    if (
+      !Number.isInteger(statusCode) ||
+      statusCode < 400 ||
+      statusCode >= 600
+    ) {
+      statusCode = 500
+    }
+
+    const code = errors.normalizeCode(
+      typeof error.code === 'string'
+        ? error.code
+        : STATUS_CODES[statusCode] || 'ERROR',
+    )
+
+    const { message = 'Server error' } = error
+
+    reply.status(statusCode).send({ error: { code, message } })
+  })
 
   fastify.get('/', (_req, reply) => {
     const stream = fs.createReadStream(INDEX_HTML_PATH)
@@ -62,7 +86,6 @@ export default async function routes(
               name: Type.String(),
             }),
           }),
-          500: { $ref: 'HttpError' },
         },
       },
     },
@@ -86,11 +109,11 @@ export default async function routes(
             data: Type.Array(
               Type.Object({
                 projectId: Type.String(),
-                name: Type.String(),
+                name: Type.Optional(Type.String()),
               }),
             ),
           }),
-          403: { $ref: 'HttpError' },
+          '4xx': schemas.errorResponse,
         },
       },
       async preHandler(req) {
@@ -122,7 +145,7 @@ export default async function routes(
               deviceId: schemas.HEX_STRING_32_BYTES,
             }),
           }),
-          400: { $ref: 'HttpError' },
+          400: schemas.errorResponse,
         },
       },
     },
@@ -152,16 +175,14 @@ export default async function routes(
           allowedProjectsSetOrNumber instanceof Set &&
           !allowedProjectsSetOrNumber.has(projectPublicId)
         ) {
-          throw fastify.httpErrors.forbidden('Project not allowed')
+          throw errors.projectNotInAllowlist()
         }
 
         if (
           typeof allowedProjectsSetOrNumber === 'number' &&
           existingProjects.length >= allowedProjectsSetOrNumber
         ) {
-          throw fastify.httpErrors.forbidden(
-            'Server is already linked to the maximum number of projects',
-          )
+          throw errors.tooManyProjects()
         }
       }
 
@@ -222,7 +243,7 @@ export default async function routes(
           projectPublicId: BASE32_STRING_32_BYTES,
         }),
         response: {
-          404: { $ref: 'HttpError' },
+          '4xx': schemas.errorResponse,
         },
       },
       async preHandler(req) {
@@ -253,8 +274,7 @@ export default async function routes(
           200: Type.Object({
             data: Type.Array(schemas.observationResult),
           }),
-          403: { $ref: 'HttpError' },
-          404: { $ref: 'HttpError' },
+          '4xx': schemas.errorResponse,
         },
       },
       async preHandler(req) {
@@ -305,8 +325,7 @@ export default async function routes(
         body: schemas.remoteDetectionAlertToAdd,
         response: {
           201: Type.Literal(''),
-          403: { $ref: 'HttpError' },
-          404: { $ref: 'HttpError' },
+          '4xx': schemas.errorResponse,
         },
       },
       async preHandler(req) {
@@ -352,8 +371,8 @@ export default async function routes(
           ),
         }),
         response: {
-          403: { $ref: 'HttpError' },
-          404: { $ref: 'HttpError' },
+          200: {},
+          '4xx': schemas.errorResponse,
         },
       },
       async preHandler(req) {
@@ -413,7 +432,7 @@ async function ensureProjectExists(fastify, req) {
     await fastify.comapeo.getProject(req.params.projectPublicId)
   } catch (e) {
     if (e instanceof Error && e.message.startsWith('NotFound')) {
-      throw fastify.httpErrors.notFound('Project not found')
+      throw errors.projectNotFoundError()
     }
     throw e
   }

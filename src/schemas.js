@@ -7,6 +7,13 @@ const dateTimeString = Type.String({ format: 'date-time' })
 const latitude = Type.Number({ minimum: -90, maximum: 90 })
 const longitude = Type.Number({ minimum: -180, maximum: 180 })
 
+export const errorResponse = Type.Object({
+  error: Type.Object({
+    code: Type.String(),
+    message: Type.String(),
+  }),
+})
+
 export const projectToAdd = Type.Object({
   projectName: Type.String({ minLength: 1 }),
   projectKey: HEX_STRING_32_BYTES,

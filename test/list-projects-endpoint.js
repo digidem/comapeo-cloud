@@ -18,7 +18,8 @@ test('listing projects', async (t) => {
       url: '/projects',
       headers: { Authorization: 'Bearer bad' },
     })
-    assert.equal(response.statusCode, 403)
+    assert.equal(response.statusCode, 401)
+    assert.equal(response.json().error.code, 'UNAUTHORIZED')
   })
 
   await t.test('with no projects', async () => {

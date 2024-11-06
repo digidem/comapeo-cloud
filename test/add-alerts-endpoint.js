@@ -21,7 +21,7 @@ import {
 /** @import { RemoteDetectionAlertValue } from '@comapeo/schema'*/
 /** @import { FastifyInstance } from 'fastify' */
 
-test('returns a 403 if no auth is provided', async (t) => {
+test('returns a 401 if no auth is provided', async (t) => {
   const server = createTestServer(t)
 
   const response = await server.inject({
@@ -30,10 +30,11 @@ test('returns a 403 if no auth is provided', async (t) => {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(generateAlert()),
   })
-  assert.equal(response.statusCode, 403)
+  assert.equal(response.statusCode, 401)
+  assert.equal(response.json().error.code, 'UNAUTHORIZED')
 })
 
-test('returns a 403 if incorrect auth is provided', async (t) => {
+test('returns a 401 if incorrect auth is provided', async (t) => {
   const server = createTestServer(t)
 
   const projectPublicId = await addProject(server)
@@ -47,22 +48,24 @@ test('returns a 403 if incorrect auth is provided', async (t) => {
     },
     body: JSON.stringify(generateAlert()),
   })
-  assert.equal(response.statusCode, 403)
+  assert.equal(response.statusCode, 401)
+  assert.equal(response.json().error.code, 'UNAUTHORIZED')
 })
 
-test('returns a 403 if trying to add alerts to a non-existent project', async (t) => {
+test('returns a 404 if trying to add alerts to a non-existent project', async (t) => {
   const server = createTestServer(t)
 
   const response = await server.inject({
     method: 'POST',
     url: `/projects/${randomProjectPublicId()}/remoteDetectionAlerts`,
     headers: {
-      Authorization: 'Bearer bad',
+      Authorization: 'Bearer ' + BEARER_TOKEN,
       'Content-Type': 'application/json',
     },
     body: JSON.stringify(generateAlert()),
   })
-  assert.equal(response.statusCode, 403)
+  assert.equal(response.statusCode, 404)
+  assert.equal(response.json().error.code, 'PROJECT_NOT_FOUND')
 })
 
 test('returns a 400 if trying to add invalid alerts', async (t) => {
@@ -154,6 +157,7 @@ test('returns a 400 if trying to add invalid alerts', async (t) => {
         400,
         `${body} should be invalid and return a 400`,
       )
+      assert.equal(response.json().error.code, 'BAD_REQUEST')
     }),
   )
 })

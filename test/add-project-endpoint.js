@@ -20,6 +20,7 @@ test('request missing project name', async (t) => {
   })
 
   assert.equal(response.statusCode, 400)
+  assert.equal(response.json().error.code, 'BAD_REQUEST')
 })
 
 test('request with empty project name', async (t) => {
@@ -32,6 +33,7 @@ test('request with empty project name', async (t) => {
   })
 
   assert.equal(response.statusCode, 400)
+  assert.equal(response.json().error.code, 'BAD_REQUEST')
 })
 
 test('request missing project key', async (t) => {
@@ -44,6 +46,7 @@ test('request missing project key', async (t) => {
   })
 
   assert.equal(response.statusCode, 400)
+  assert.equal(response.json().error.code, 'BAD_REQUEST')
 })
 
 test("request with a project key that's too short", async (t) => {
@@ -56,6 +59,7 @@ test("request with a project key that's too short", async (t) => {
   })
 
   assert.equal(response.statusCode, 400)
+  assert.equal(response.json().error.code, 'BAD_REQUEST')
 })
 
 test('request missing any encryption keys', async (t) => {
@@ -68,6 +72,7 @@ test('request missing any encryption keys', async (t) => {
   })
 
   assert.equal(response.statusCode, 400)
+  assert.equal(response.json().error.code, 'BAD_REQUEST')
 })
 
 test('request missing an encryption key', async (t) => {
@@ -84,6 +89,7 @@ test('request missing an encryption key', async (t) => {
   })
 
   assert.equal(response.statusCode, 400)
+  assert.equal(response.json().error.code, 'BAD_REQUEST')
 })
 
 test("request with an encryption key that's too short", async (t) => {
@@ -100,6 +106,7 @@ test("request with an encryption key that's too short", async (t) => {
   })
 
   assert.equal(response.statusCode, 400)
+  assert.equal(response.json().error.code, 'BAD_REQUEST')
 })
 
 test('adding a project', async (t) => {
@@ -133,7 +140,8 @@ test('adding a second project fails by default', async (t) => {
     body: randomAddProjectBody(),
   })
   assert.equal(response.statusCode, 403)
-  assert.match(response.json().message, /maximum number of projects/u)
+  assert.equal(response.json().error.code, 'TOO_MANY_PROJECTS')
+  assert.match(response.json().error.message, /maximum number of projects/u)
 })
 
 test('allowing a maximum number of projects', async (t) => {
@@ -157,7 +165,8 @@ test('allowing a maximum number of projects', async (t) => {
       body: randomAddProjectBody(),
     })
     assert.equal(response.statusCode, 403)
-    assert.match(response.json().message, /maximum number of projects/u)
+    assert.equal(response.json().error.code, 'TOO_MANY_PROJECTS')
+    assert.match(response.json().error.message, /maximum number of projects/u)
   })
 })
 
@@ -189,6 +198,7 @@ test(
         body: randomAddProjectBody(),
       })
       assert.equal(response.statusCode, 403)
+      assert.equal(response.json().error.code, 'PROJECT_NOT_IN_ALLOWLIST')
     })
   },
 )

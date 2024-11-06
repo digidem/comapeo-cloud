@@ -26,17 +26,18 @@ const FIXTURE_PREVIEW_PATH = new URL('preview.jpg', FIXTURES_ROOT).pathname
 const FIXTURE_THUMBNAIL_PATH = new URL('thumbnail.jpg', FIXTURES_ROOT).pathname
 const FIXTURE_AUDIO_PATH = new URL('audio.mp3', FIXTURES_ROOT).pathname
 
-test('returns a 403 if no auth is provided', async (t) => {
+test('returns a 401 if no auth is provided', async (t) => {
   const server = createTestServer(t)
 
   const response = await server.inject({
     method: 'GET',
     url: `/projects/${randomProjectPublicId()}/observations`,
   })
-  assert.equal(response.statusCode, 403)
+  assert.equal(response.statusCode, 401)
+  assert.equal(response.json().error.code, 'UNAUTHORIZED')
 })
 
-test('returns a 403 if incorrect auth is provided', async (t) => {
+test('returns a 401 if incorrect auth is provided', async (t) => {
   const server = createTestServer(t)
 
   const response = await server.inject({
@@ -44,7 +45,8 @@ test('returns a 403 if incorrect auth is provided', async (t) => {
     url: `/projects/${randomProjectPublicId()}/observations`,
     headers: { Authorization: 'Bearer bad' },
   })
-  assert.equal(response.statusCode, 403)
+  assert.equal(response.statusCode, 401)
+  assert.equal(response.json().error.code, 'UNAUTHORIZED')
 })
 
 test('returning no observations', async (t) => {

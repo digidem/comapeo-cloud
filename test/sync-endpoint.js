@@ -22,7 +22,7 @@ test('sync endpoint is available after adding a project', async (t) => {
       },
     })
     assert.equal(response.statusCode, 404)
-    assert.equal(response.json().error, 'Not Found')
+    assert.equal(response.json().error.code, 'PROJECT_NOT_FOUND')
   })
 
   await server.inject({
@@ -51,5 +51,5 @@ test('sync endpoint returns error with an invalid project public ID', async (t) 
   })
 
   assert.equal(response.statusCode, 400)
-  assert.equal(response.json().code, 'FST_ERR_VALIDATION')
+  assert.equal(response.json().error.code, 'BAD_REQUEST')
 })
