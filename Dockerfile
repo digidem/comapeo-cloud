@@ -12,8 +12,8 @@ RUN npm ci --omit=dev
 # --------------> The production image__
 FROM node:${NODE_VERSION}-bullseye-slim
 
-ENV NODE_ENV production
-ENV PORT 8080
+ENV NODE_ENV=production
+ENV PORT=8080
 EXPOSE 8080
 COPY --from=build /usr/bin/dumb-init /usr/bin/dumb-init
 USER node
