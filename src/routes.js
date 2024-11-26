@@ -464,7 +464,7 @@ async function ensureProjectExists(fastify, req) {
   try {
     await fastify.comapeo.getProject(req.params.projectPublicId)
   } catch (e) {
-    if (e instanceof Error && e.message.startsWith('NotFound')) {
+    if (e instanceof Error && e.constructor.name === 'NotFoundError') {
       throw errors.projectNotFoundError()
     }
     throw e
