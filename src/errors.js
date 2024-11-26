@@ -23,6 +23,10 @@ class HttpError extends Error {
   }
 }
 
+/** @param {string} message */
+export const badRequestError = (message) =>
+  new HttpError(400, 'BAD_REQUEST', message)
+
 export const invalidBearerToken = () =>
   new HttpError(401, 'UNAUTHORIZED', 'Invalid bearer token')
 
@@ -38,6 +42,10 @@ export const tooManyProjects = () =>
 
 export const projectNotFoundError = () =>
   new HttpError(404, 'PROJECT_NOT_FOUND', 'Project not found')
+
+/** @param {never} value */
+export const shouldBeImpossibleError = (value) =>
+  new Error(`${value} should be impossible`)
 
 /**
  * @param {string} str
