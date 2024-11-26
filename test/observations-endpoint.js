@@ -92,7 +92,6 @@ test('returning observations with fetchable attachments', async (t) => {
   const observations = await Promise.all([
     (() => {
       /** @type {ObservationValue} */
-      // @ts-ignore
       const noAttachments = {
         ...generateObservation(),
         attachments: [],
@@ -100,7 +99,6 @@ test('returning observations with fetchable attachments', async (t) => {
       return project.observation.create(noAttachments)
     })(),
     (async () => {
-      // @ts-ignore
       const { docId } = await project.observation.create(generateObservation())
       return project.observation.delete(docId)
     })(),
@@ -120,7 +118,6 @@ test('returning observations with fetchable attachments', async (t) => {
         ),
       ])
       /** @type {ObservationValue} */
-      // @ts-ignore
       const withAttachment = {
         ...generateObservation(),
         attachments: [blobToAttachment(imageBlob), blobToAttachment(audioBlob)],
