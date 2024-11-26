@@ -21,9 +21,12 @@ import {
 /** @import { FastifyInstance } from 'fastify' */
 
 const FIXTURES_ROOT = new URL('./fixtures/', import.meta.url)
-const FIXTURE_ORIGINAL_PATH = new URL('original.jpg', FIXTURES_ROOT).pathname
-const FIXTURE_PREVIEW_PATH = new URL('preview.jpg', FIXTURES_ROOT).pathname
-const FIXTURE_THUMBNAIL_PATH = new URL('thumbnail.jpg', FIXTURES_ROOT).pathname
+const FIXTURE_IMAGE_ORIGINAL_PATH = new URL('original.jpg', FIXTURES_ROOT)
+  .pathname
+const FIXTURE_IMAGE_PREVIEW_PATH = new URL('preview.jpg', FIXTURES_ROOT)
+  .pathname
+const FIXTURE_IMAGE_THUMBNAIL_PATH = new URL('thumbnail.jpg', FIXTURES_ROOT)
+  .pathname
 const FIXTURE_AUDIO_PATH = new URL('audio.mp3', FIXTURES_ROOT).pathname
 
 test('returns a 401 if no auth is provided', async (t) => {
@@ -106,9 +109,9 @@ test('returning observations with fetchable attachments', async (t) => {
       const [imageBlob, audioBlob] = await Promise.all([
         project.$blobs.create(
           {
-            original: FIXTURE_ORIGINAL_PATH,
-            preview: FIXTURE_PREVIEW_PATH,
-            thumbnail: FIXTURE_THUMBNAIL_PATH,
+            original: FIXTURE_IMAGE_ORIGINAL_PATH,
+            preview: FIXTURE_IMAGE_PREVIEW_PATH,
+            thumbnail: FIXTURE_IMAGE_THUMBNAIL_PATH,
           },
           { mimeType: 'image/jpeg', timestamp: Date.now() },
         ),
@@ -156,9 +159,10 @@ test('returning observations with fetchable attachments', async (t) => {
       assert.equal(observationFromApi.lon, observation.lon)
       assert.equal(observationFromApi.deleted, observation.deleted)
       if (!observationFromApi.deleted) {
-        await assertAttachmentsCanBeFetchedAsJpeg({
+        await assertAttachmentsCanBeFetched({
           server,
           serverAddress,
+          observation,
           observationFromApi,
         })
       }
@@ -193,28 +197,42 @@ function blobToAttachment(blob) {
  * @param {object} options
  * @param {FastifyInstance} options.server
  * @param {string} options.serverAddress
+ * @param {Pick<ObservationValue, 'attachments'>} options.observation
  * @param {Record<string, unknown>} options.observationFromApi
  * @returns {Promise<void>}
  */
-async function assertAttachmentsCanBeFetchedAsJpeg({
+async function assertAttachmentsCanBeFetched({
   server,
   serverAddress,
+  observation,
   observationFromApi,
 }) {
   assert(Array.isArray(observationFromApi.attachments))
+
+  assert.equal(
+    observationFromApi.attachments.length,
+    observation.attachments.length,
+    'expected returned observation to have correct number of attachments',
+  )
+
   await Promise.all(
-    observationFromApi.attachments.map(
-      /** @param {unknown} attachment */
-      async (attachment) => {
-        assert(attachment && typeof attachment === 'object')
-        assert('url' in attachment && typeof attachment.url === 'string')
-        await assertAttachmentAndVariantsCanBeFetched(
-          server,
-          serverAddress,
-          attachment.url,
-        )
-      },
-    ),
+    observationFromApi.attachments.map(async (attachment, index) => {
+      const expectedType = (observation.attachments[index] || {}).type
+      assert(
+        expectedType === 'photo' || expectedType === 'audio',
+        'test setup: attachment is either photo or video',
+      )
+
+      assert(attachment && typeof attachment === 'object')
+      assert('url' in attachment && typeof attachment.url === 'string')
+
+      await assertAttachmentAndVariantsCanBeFetched(
+        server,
+        serverAddress,
+        attachment.url,
+        expectedType,
+      )
+    }),
   )
 }
 
@@ -222,22 +240,41 @@ async function assertAttachmentsCanBeFetchedAsJpeg({
  * @param {FastifyInstance} server
  * @param {string} serverAddress
  * @param {string} url
+ * @param {'photo' | 'audio'} expectedType
  * @returns {Promise<void>}
  */
 async function assertAttachmentAndVariantsCanBeFetched(
   server,
   serverAddress,
   url,
+  expectedType,
 ) {
   assert(url.startsWith(serverAddress))
 
-  /** @type {Map<null | string, string>} */
-  const variantsToCheck = new Map([
-    [null, FIXTURE_ORIGINAL_PATH],
-    ['original', FIXTURE_ORIGINAL_PATH],
-    ['preview', FIXTURE_PREVIEW_PATH],
-    ['thumbnail', FIXTURE_THUMBNAIL_PATH],
-  ])
+  /** @type {Map<null | string, string>} */ let variantsToCheck
+  /** @type {string} */ let expectedContentType
+  switch (expectedType) {
+    case 'photo':
+      variantsToCheck = new Map([
+        [null, FIXTURE_IMAGE_ORIGINAL_PATH],
+        ['original', FIXTURE_IMAGE_ORIGINAL_PATH],
+        ['preview', FIXTURE_IMAGE_PREVIEW_PATH],
+        ['thumbnail', FIXTURE_IMAGE_THUMBNAIL_PATH],
+      ])
+      expectedContentType = 'image/jpeg'
+      break
+    case 'audio':
+      variantsToCheck = new Map([
+        [null, FIXTURE_AUDIO_PATH],
+        ['original', FIXTURE_AUDIO_PATH],
+      ])
+      expectedContentType = 'audio/mpeg'
+      break
+    default: {
+      /** @type {never} */ const exhaustiveCheck = expectedType
+      assert.fail(`test setup:${exhaustiveCheck} should be impossible`)
+    }
+  }
 
   await Promise.all(
     map(variantsToCheck, async ([variant, fixturePath]) => {
@@ -254,8 +291,8 @@ async function assertAttachmentAndVariantsCanBeFetched(
       )
       assert.equal(
         attachmentResponse.headers['content-type'],
-        'image/jpeg',
-        `expected ${variant} attachment to be a JPEG`,
+        expectedContentType,
+        `expected ${variant} attachment to be a ${expectedContentType}`,
       )
       assert.deepEqual(
         attachmentResponse.rawPayload,

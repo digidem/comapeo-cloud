@@ -21,6 +21,10 @@ const BASE32_STRING_32_BYTES = Type.String({ pattern: BASE32_REGEX_32_BYTES })
 
 const INDEX_HTML_PATH = new URL('./static/index.html', import.meta.url)
 
+const SUPPORTED_ATTACHMENT_TYPES = new Set(
+  /** @type {const} */ (['photo', 'audio']),
+)
+
 /**
  * @typedef {object} RouteOptions
  * @prop {string} serverBearerToken
@@ -299,9 +303,11 @@ export default async function routes(
             lat: obs.lat,
             lon: obs.lon,
             attachments: obs.attachments
-              // TODO: For now, only photos are supported.
-              // See <https://github.com/digidem/comapeo-cloud/issues/25>.
-              .filter((attachment) => attachment.type === 'photo')
+              .filter((attachment) =>
+                SUPPORTED_ATTACHMENT_TYPES.has(
+                  /** @type {any} */ (attachment.type),
+                ),
+              )
               .map((attachment) => ({
                 url: new URL(
                   `projects/${projectPublicId}/attachments/${attachment.driveDiscoveryId}/${attachment.type}/${attachment.name}`,
@@ -356,13 +362,18 @@ export default async function routes(
         params: Type.Object({
           projectPublicId: BASE32_STRING_32_BYTES,
           driveDiscoveryId: Type.String(),
-          // TODO: For now, only photos are supported.
-          // See <https://github.com/digidem/comapeo-cloud/issues/25>.
-          type: Type.Literal('photo'),
+          type: Type.Union(
+            [...SUPPORTED_ATTACHMENT_TYPES].map((attachmentType) =>
+              Type.Literal(attachmentType),
+            ),
+          ),
           name: Type.String(),
         }),
         querystring: Type.Object({
           variant: Type.Optional(
+            // Not all of these are valid for all attachment types.
+            // For example, you can't get an audio's thumbnail.
+            // We do additional checking later to verify validity.
             Type.Union([
               Type.Literal('original'),
               Type.Literal('preview'),
@@ -386,11 +397,33 @@ export default async function routes(
     async function (req, reply) {
       const project = await this.comapeo.getProject(req.params.projectPublicId)
 
+      let typeAndVariant
+      switch (req.params.type) {
+        case 'photo':
+          typeAndVariant = {
+            type: /** @type {const} */ ('photo'),
+            variant: req.query.variant || 'original',
+          }
+          break
+        case 'audio':
+          if (req.query.variant && req.query.variant !== 'original') {
+            throw errors.badRequestError(
+              'Cannot fetch this variant for audio attachments',
+            )
+          }
+          typeAndVariant = {
+            type: /** @type {const} */ ('audio'),
+            variant: /** @type {const} */ ('original'),
+          }
+          break
+        default:
+          throw errors.shouldBeImpossibleError(req.params.type)
+      }
+
       const blobUrl = await project.$blobs.getUrl({
         driveId: req.params.driveDiscoveryId,
         name: req.params.name,
-        type: req.params.type,
-        variant: req.query.variant || 'original',
+        ...typeAndVariant,
       })
 
       const proxiedResponse = await fetch(blobUrl)
