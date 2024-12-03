@@ -52,6 +52,8 @@ export const observationResult = Type.Object({
   ),
 })
 
+const position = Type.Tuple([longitude, latitude])
+
 export const remoteDetectionAlertToAdd = Type.Object({
   detectionDateStart: dateTimeString,
   detectionDateEnd: dateTimeString,
@@ -68,8 +70,32 @@ export const remoteDetectionAlertToAdd = Type.Object({
       ),
     ]),
   ),
-  geometry: Type.Object({
-    type: Type.Literal('Point'),
-    coordinates: Type.Tuple([longitude, latitude]),
-  }),
+  geometry: Type.Union([
+    Type.Object({
+      type: Type.Literal('Point'),
+      coordinates: position,
+    }),
+    Type.Object({
+      type: Type.Literal('LineString'),
+      coordinates: Type.Array(position, { minItems: 2 }),
+    }),
+    Type.Object({
+      type: Type.Literal('MultiLineString'),
+      coordinates: Type.Array(Type.Array(position, { minItems: 2 })),
+    }),
+    Type.Object({
+      type: Type.Literal('Polygon'),
+      coordinates: Type.Array(Type.Array(position, { minItems: 4 })),
+    }),
+    Type.Object({
+      type: Type.Literal('MultiPoint'),
+      coordinates: Type.Array(position),
+    }),
+    Type.Object({
+      type: Type.Literal('MultiPolygon'),
+      coordinates: Type.Array(
+        Type.Array(Type.Array(position, { minItems: 4 })),
+      ),
+    }),
+  ]),
 })
