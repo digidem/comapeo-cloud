@@ -321,6 +321,50 @@ export default async function routes(
     },
   )
 
+  fastify.get(
+    '/projects/:projectPublicId/remoteDetectionAlerts',
+    {
+      schema: {
+        params: Type.Object({
+          projectPublicId: BASE32_STRING_32_BYTES,
+        }),
+        response: {
+          200: Type.Object({
+            data: Type.Array(schemas.remoteDetectionAlertResult),
+          }),
+          '4xx': schemas.errorResponse,
+        },
+      },
+      async preHandler(req) {
+        verifyBearerAuth(req)
+        await ensureProjectExists(this, req)
+      },
+    },
+    /**
+     * @this {FastifyInstance}
+     */
+    async function (req) {
+      const { projectPublicId } = req.params
+      const project = await this.comapeo.getProject(projectPublicId)
+
+      return {
+        data: (
+          await project.remoteDetectionAlert.getMany({ includeDeleted: true })
+        ).map((alert) => ({
+          docId: alert.docId,
+          createdAt: alert.createdAt,
+          updatedAt: alert.updatedAt,
+          deleted: alert.deleted,
+          detectionDateStart: alert.detectionDateStart,
+          detectionDateEnd: alert.detectionDateEnd,
+          sourceId: alert.sourceId,
+          metadata: alert.metadata,
+          geometry: alert.geometry,
+        })),
+      }
+    },
+  )
+
   fastify.post(
     '/projects/:projectPublicId/remoteDetectionAlerts',
     {
