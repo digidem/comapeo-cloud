@@ -22,10 +22,10 @@
     "format": "prettier --write .",
     "test:prettier": "prettier --check .",
     "test:eslint": "eslint .",
-    "test:typescript": "tsc --project ./tsconfig.dev.json",
+    "test:typescript": "tsc --project ./tsconfig.json",
     "test:node": "node --test",
     "test": "npm-run-all --aggregate-output --print-label --parallel test:*",
-    "watch:test:typescript": "tsc --watch --project ./tsconfig.dev.json",
+    "watch:test:typescript": "tsc --watch --project ./tsconfig.json",
     "watch:test:node": "npm run test:node -- --watch",
     "prepare": "husky || true",
     "prepack": "npm run build"
