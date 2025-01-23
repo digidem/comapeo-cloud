@@ -344,7 +344,14 @@ export default async function routes(
      */
     async function (req, reply) {
       const { projectPublicId } = req.params
-      const project = await this.comapeo.getProject(projectPublicId)
+      console.log('projectPublicId', projectPublicId)
+      let project
+      try {
+        project = await this.comapeo.getProject(projectPublicId)
+      } catch (e) {
+        console.error(e)
+        throw e
+      }
 
       await project.remoteDetectionAlert.create({
         schemaName: 'remoteDetectionAlert',
