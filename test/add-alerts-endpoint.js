@@ -239,7 +239,7 @@ const SUPPORTED_GEOMETRY_TYPES = /** @type {const} */ ([
 
 /**
  * @param {number} count
- * @param {Array<typeof SUPPORTED_GEOMETRY_TYPES[number]>} [geometryTypes]
+ * @param {ReadonlyArray<typeof SUPPORTED_GEOMETRY_TYPES[number]>} [geometryTypes]
  */
 function generateAlerts(count, geometryTypes = SUPPORTED_GEOMETRY_TYPES) {
   if (count < geometryTypes.length) {
@@ -250,7 +250,7 @@ function generateAlerts(count, geometryTypes = SUPPORTED_GEOMETRY_TYPES) {
   // Hacky, but should get the job done ensuring we have all geometry types in the test
   const alerts = []
   for (const geometryType of geometryTypes) {
-    /** @type {import('@comapeo/schema').RemoteDetectionAlert} */
+    /** @type {import('@comapeo/schema').RemoteDetectionAlert | undefined} */
     let alert
     while (!alert || alert.geometry.type !== geometryType) {
       ;[alert] = generate('remoteDetectionAlert', { count: 1 })
