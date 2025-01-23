@@ -223,16 +223,44 @@ async function addProject(server) {
 }
 
 function generateAlert() {
-  const [result] = generateAlerts(1)
+  const [result] = generateAlerts(1, ['Point'])
   assert(result)
   return result
 }
 
+const SUPPORTED_GEOMETRY_TYPES = /** @type {const} */ ([
+  'Point',
+  'MultiPoint',
+  'LineString',
+  'MultiLineString',
+  'Polygon',
+  'MultiPolygon',
+])
+
 /**
  * @param {number} count
+ * @param {Array<typeof SUPPORTED_GEOMETRY_TYPES[number]>} [geometryTypes]
  */
-function generateAlerts(count) {
-  return generate('remoteDetectionAlert', { count }).map((alert) => {
-    return valueOf(alert)
-  })
+function generateAlerts(count, geometryTypes = SUPPORTED_GEOMETRY_TYPES) {
+  if (count < geometryTypes.length) {
+    throw new Error(
+      'test setup: count must be at least as large as geometryTypes',
+    )
+  }
+  // Hacky, but should get the job done ensuring we have all geometry types in the test
+  const alerts = []
+  for (const geometryType of geometryTypes) {
+    /** @type {import('@comapeo/schema').RemoteDetectionAlert} */
+    let alert
+    while (!alert || alert.geometry.type !== geometryType) {
+      ;[alert] = generate('remoteDetectionAlert', { count: 1 })
+    }
+    alerts.push(alert)
+  }
+  // eslint-disable-next-line prefer-spread
+  alerts.push.apply(
+    alerts,
+    generate('remoteDetectionAlert', { count: count - alerts.length }),
+  )
+  return alerts.map((alert) => valueOf(alert))
 }
