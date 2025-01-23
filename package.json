@@ -22,10 +22,10 @@
     "format": "prettier --write .",
     "test:prettier": "prettier --check .",
     "test:eslint": "eslint .",
-    "test:typescript": "tsc --project ./tsconfig.dev.json",
+    "test:typescript": "tsc --project ./tsconfig.json",
     "test:node": "node --test",
     "test": "npm-run-all --aggregate-output --print-label --parallel test:*",
-    "watch:test:typescript": "tsc --watch --project ./tsconfig.dev.json",
+    "watch:test:typescript": "tsc --watch --project ./tsconfig.json",
     "watch:test:node": "npm run test:node -- --watch",
     "prepare": "husky || true",
     "prepack": "npm run build"
@@ -59,7 +59,7 @@
     "typescript": "^5.6.3"
   },
   "dependencies": {
-    "@comapeo/core": "^2.1.0",
+    "@comapeo/core": "^2.3.1",
     "@fastify/sensible": "^5.6.0",
     "@fastify/websocket": "^10.0.1",
     "@mapeo/crypto": "^1.0.0-alpha.10",

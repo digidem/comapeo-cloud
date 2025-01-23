@@ -18,7 +18,6 @@ import {
   runWithRetries,
 } from './test-helpers.js'
 
-/** @import { RemoteDetectionAlertValue } from '@comapeo/schema'*/
 /** @import { FastifyInstance } from 'fastify' */
 
 test('returns a 401 if no auth is provided', async (t) => {
@@ -119,16 +118,6 @@ test('returns a 400 if trying to add invalid alerts', async (t) => {
         coordinates: [0, 90.01],
       },
     },
-    {
-      ...generateAlert(),
-      geometry: {
-        type: 'MultiPoint',
-        coordinates: [
-          [1, 2],
-          [3, 4],
-        ],
-      },
-    },
     ...alertKeys.flatMap((keyToMessUp) => [
       omit(generateAlert(), keyToMessUp),
       { ...generateAlert(), [keyToMessUp]: null },
@@ -177,32 +166,42 @@ test('adding alerts', async (t) => {
     dangerouslyAllowInsecureConnections: true,
   })
 
-  const alert = generateAlert()
+  const alerts = generateAlerts(100)
 
-  const response = await server.inject({
-    authority: serverUrl.host,
-    method: 'POST',
-    url: `/projects/${projectId}/remoteDetectionAlerts`,
-    headers: {
-      Authorization: 'Bearer ' + BEARER_TOKEN,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(alert),
-  })
-  assert.equal(response.statusCode, 201)
-  assert.equal(response.body, '')
+  await Promise.all(
+    alerts.map(async (alert) => {
+      const response = await server.inject({
+        authority: serverUrl.host,
+        method: 'POST',
+        url: `/projects/${projectId}/remoteDetectionAlerts`,
+        headers: {
+          Authorization: 'Bearer ' + BEARER_TOKEN,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(alert),
+      })
+      assert.equal(response.statusCode, 201)
+      assert.equal(response.body, '')
+    }),
+  )
 
   project.$sync.start()
   project.$sync.connectServers()
 
   await project.$sync.waitForSync('full')
 
+  const expectedSourceIds = new Set(alerts.map((a) => a.sourceId))
+
   // It's possible that the client thinks it's synced but doesn't know about
   // the server's alert yet, so we try a few times.
   await runWithRetries(3, async () => {
     const alerts = await project.remoteDetectionAlert.getMany()
-    const hasOurAlert = alerts.some((a) => a.sourceId === alert.sourceId)
-    assert(hasOurAlert, 'alert was added and synced')
+    const actualSourceIds = new Set(alerts.map((a) => a.sourceId))
+    assert.deepEqual(
+      actualSourceIds,
+      expectedSourceIds,
+      'alerts were added and synced',
+    )
   })
 })
 
@@ -223,23 +222,45 @@ async function addProject(server) {
   return projectKeyToPublicId(Buffer.from(projectKey, 'hex'))
 }
 
-/**
- * @param {number} min
- * @param {number} max
- * @returns {number}
- */
-const randomNumber = (min, max) => min + Math.random() * (max - min)
-const randomLatitude = randomNumber.bind(null, -90, 90)
-const randomLongitude = randomNumber.bind(null, -180, 180)
-
 function generateAlert() {
-  const remoteDetectionAlertDoc = generate('remoteDetectionAlert')[0]
-  assert(remoteDetectionAlertDoc)
-  return valueOf({
-    ...remoteDetectionAlertDoc,
-    geometry: {
-      type: 'Point',
-      coordinates: [randomLongitude(), randomLatitude()],
-    },
-  })
+  const [result] = generateAlerts(1, ['Point'])
+  assert(result)
+  return result
+}
+
+const SUPPORTED_GEOMETRY_TYPES = /** @type {const} */ ([
+  'Point',
+  'MultiPoint',
+  'LineString',
+  'MultiLineString',
+  'Polygon',
+  'MultiPolygon',
+])
+
+/**
+ * @param {number} count
+ * @param {ReadonlyArray<typeof SUPPORTED_GEOMETRY_TYPES[number]>} [geometryTypes]
+ */
+function generateAlerts(count, geometryTypes = SUPPORTED_GEOMETRY_TYPES) {
+  if (count < geometryTypes.length) {
+    throw new Error(
+      'test setup: count must be at least as large as geometryTypes',
+    )
+  }
+  // Hacky, but should get the job done ensuring we have all geometry types in the test
+  const alerts = []
+  for (const geometryType of geometryTypes) {
+    /** @type {import('@comapeo/schema').RemoteDetectionAlert | undefined} */
+    let alert
+    while (!alert || alert.geometry.type !== geometryType) {
+      ;[alert] = generate('remoteDetectionAlert', { count: 1 })
+    }
+    alerts.push(alert)
+  }
+  // eslint-disable-next-line prefer-spread
+  alerts.push.apply(
+    alerts,
+    generate('remoteDetectionAlert', { count: count - alerts.length }),
+  )
+  return alerts.map((alert) => valueOf(alert))
 }
