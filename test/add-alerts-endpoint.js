@@ -1,7 +1,5 @@
 import { MapeoManager } from '@comapeo/core'
-import { valueOf } from '@comapeo/schema'
 import { keyToPublicId as projectKeyToPublicId } from '@mapeo/crypto'
-import { generate } from '@mapeo/mock-data'
 import { Value } from '@sinclair/typebox/value'
 
 import assert from 'node:assert/strict'
@@ -11,6 +9,8 @@ import { remoteDetectionAlertToAdd } from '../src/schemas.js'
 import {
   BEARER_TOKEN,
   createTestServer,
+  generateAlert,
+  generateAlerts,
   getManagerOptions,
   omit,
   randomAddProjectBody,
@@ -220,47 +220,4 @@ async function addProject(server) {
 
   const { projectKey } = body
   return projectKeyToPublicId(Buffer.from(projectKey, 'hex'))
-}
-
-function generateAlert() {
-  const [result] = generateAlerts(1, ['Point'])
-  assert(result)
-  return result
-}
-
-const SUPPORTED_GEOMETRY_TYPES = /** @type {const} */ ([
-  'Point',
-  'MultiPoint',
-  'LineString',
-  'MultiLineString',
-  'Polygon',
-  'MultiPolygon',
-])
-
-/**
- * @param {number} count
- * @param {ReadonlyArray<typeof SUPPORTED_GEOMETRY_TYPES[number]>} [geometryTypes]
- */
-function generateAlerts(count, geometryTypes = SUPPORTED_GEOMETRY_TYPES) {
-  if (count < geometryTypes.length) {
-    throw new Error(
-      'test setup: count must be at least as large as geometryTypes',
-    )
-  }
-  // Hacky, but should get the job done ensuring we have all geometry types in the test
-  const alerts = []
-  for (const geometryType of geometryTypes) {
-    /** @type {import('@comapeo/schema').RemoteDetectionAlert | undefined} */
-    let alert
-    while (!alert || alert.geometry.type !== geometryType) {
-      ;[alert] = generate('remoteDetectionAlert', { count: 1 })
-    }
-    alerts.push(alert)
-  }
-  // eslint-disable-next-line prefer-spread
-  alerts.push.apply(
-    alerts,
-    generate('remoteDetectionAlert', { count: count - alerts.length }),
-  )
-  return alerts.map((alert) => valueOf(alert))
 }
