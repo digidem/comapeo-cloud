@@ -16,6 +16,8 @@ Server configuration is done using environment variables. The following environm
 | `ALLOWED_PROJECTS`    | No       | Number of projects allowed to register with the server               | `1`              |
 | `STORAGE_DIR`         | No       | Path for storing app & project data                                  | `$CWD/data`      |
 
+If you are using Nginx to act as a reverse proxy for your CoMapeo Cloud server, ensure your proxy headers are configured to support WebSockets.
+
 ### Deploying with fly.io
 
 CoMapeo Cloud can be deployed on [fly.io](https://fly.io) using the following steps:
