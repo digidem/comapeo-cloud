@@ -4,7 +4,21 @@ A self-hosted cloud server for CoMapeo.
 
 ## Deploying CoMapeo Cloud
 
-CoMapeo Cloud comes with a [`Dockerfile`](./Dockerfile) that can be used to build a Docker image. This image can be used to deploy CoMapeo Cloud on a server.
+CoMapeo Cloud can be deployed using Docker. The official Docker image is available on Docker Hub at `communityfirst/comapeo-cloud`.
+
+### Using Docker
+
+Pull and run the latest version:
+
+```sh
+docker run -d \
+  -p 8080:8080 \
+  -e SERVER_BEARER_TOKEN=<your-secret-token> \
+  -v /path/to/data:/usr/src/app/data \
+  communityfirst/comapeo-cloud:latest
+```
+
+Or use the [`Dockerfile`](./Dockerfile) to build a Docker image.
 
 Server configuration is done using environment variables. The following environment variables are available:
 
