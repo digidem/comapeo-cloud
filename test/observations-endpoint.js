@@ -113,11 +113,11 @@ test('returning observations with fetchable attachments', async (t) => {
             preview: FIXTURE_IMAGE_PREVIEW_PATH,
             thumbnail: FIXTURE_IMAGE_THUMBNAIL_PATH,
           },
-          { mimeType: 'image/jpeg', timestamp: Date.now() },
+          { mimeType: 'image/jpeg' },
         ),
         project.$blobs.create(
           { original: FIXTURE_AUDIO_PATH },
-          { mimeType: 'audio/mpeg', timestamp: Date.now() },
+          { mimeType: 'audio/mpeg' },
         ),
       ])
       /** @type {ObservationValue} */
@@ -190,6 +190,7 @@ function blobToAttachment(blob) {
     type: blob.type,
     name: blob.name,
     hash: blob.hash,
+    external: false,
   }
 }
 
