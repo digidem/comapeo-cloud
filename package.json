@@ -71,5 +71,10 @@
     "fastify": "^4.28.1",
     "string-timing-safe-equal": "^0.1.0",
     "ws": "^8.18.0"
+  },
+  "overrides": {
+    "@hyperswarm/secret-stream": "6.6.3",
+    "sodium-secretstream": "1.1.0",
+    "noise-curve-ed": "2.0.1"
   }
 }
