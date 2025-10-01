@@ -267,59 +267,60 @@ export default async function routes(
     },
   )
 
-  fastify.get(
-    '/projects/:projectPublicId/observations',
-    {
-      schema: {
-        params: Type.Object({
-          projectPublicId: BASE32_STRING_32_BYTES,
-        }),
-        response: {
-          200: Type.Object({
-            data: Type.Array(schemas.observationResult),
+  addDatatypeGetter('observation', schemas.observationResult, (obs, req) => ({
+    docId: obs.docId,
+    createdAt: obs.createdAt,
+    updatedAt: obs.updatedAt,
+    deleted: obs.deleted,
+    lat: obs.lat,
+    lon: obs.lon,
+    attachments: obs.attachments
+      .filter((attachment) =>
+        SUPPORTED_ATTACHMENT_TYPES.has(/** @type {any} */ (attachment.type)),
+      )
+      .map((attachment) => ({
+        url: new URL(
+          `projects/${req.params.projectPublicId}/attachments/${attachment.driveDiscoveryId}/${attachment.type}/${attachment.name}`,
+          req.baseUrl,
+        ).href,
+      })),
+    tags: obs.tags,
+  }))
+
+  function addDatatypeGetter(dataType, responseSchema, mapDoc = (doc) => doc) {
+    fastify.get(
+      `/projects/:projectPublicId/${dataType}s`,
+      {
+        schema: {
+          params: Type.Object({
+            projectPublicId: BASE32_STRING_32_BYTES,
           }),
-          '4xx': schemas.errorResponse,
+          response: {
+            200: Type.Object({
+              data: Type.Array(responseSchema),
+            }),
+            '4xx': schemas.errorResponse,
+          },
+        },
+        async preHandler(req) {
+          verifyBearerAuth(req)
+          await ensureProjectExists(this, req)
         },
       },
-      async preHandler(req) {
-        verifyBearerAuth(req)
-        await ensureProjectExists(this, req)
-      },
-    },
-    /**
-     * @this {FastifyInstance}
-     */
-    async function (req) {
-      const { projectPublicId } = req.params
-      const project = await this.comapeo.getProject(projectPublicId)
+      /**
+       * @this {FastifyInstance}
+       */
+      async function (req) {
+        const { projectPublicId } = req.params
+        const project = await this.comapeo.getProject(projectPublicId)
+        const data = (
+          await project[dataType].getMany({ includeDeleted: true })
+        ).map((doc) => mapDoc(doc, req))
 
-      return {
-        data: (await project.observation.getMany({ includeDeleted: true })).map(
-          (obs) => ({
-            docId: obs.docId,
-            createdAt: obs.createdAt,
-            updatedAt: obs.updatedAt,
-            deleted: obs.deleted,
-            lat: obs.lat,
-            lon: obs.lon,
-            attachments: obs.attachments
-              .filter((attachment) =>
-                SUPPORTED_ATTACHMENT_TYPES.has(
-                  /** @type {any} */ (attachment.type),
-                ),
-              )
-              .map((attachment) => ({
-                url: new URL(
-                  `projects/${projectPublicId}/attachments/${attachment.driveDiscoveryId}/${attachment.type}/${attachment.name}`,
-                  req.baseUrl,
-                ).href,
-              })),
-            tags: obs.tags,
-          }),
-        ),
-      }
-    },
-  )
+        return { data }
+      },
+    )
+  }
 
   fastify.get(
     '/projects/:projectPublicId/remoteDetectionAlerts',
