@@ -287,6 +287,86 @@ export default async function routes(
     tags: obs.tags,
   }))
 
+  addDatatypeGetter('track', schemas.trackResult, (track) => ({
+    docId: track.docId,
+    createdAt: track.createdAt,
+    updatedAt: track.updatedAt,
+    deleted: track.deleted,
+    locations: track.locations,
+    observationRefs: track.observationRefs,
+    tags: track.tags,
+    presetRef: track.presetRef,
+  }))
+
+  addDatatypeGetter('translation', schemas.translationResult, (trans) => ({
+    docId: trans.docId,
+    createdAt: trans.createdAt,
+    updatedAt: trans.updatedAt,
+    deleted: trans.deleted,
+    docRef: trans.docRef,
+    docRefType: trans.docRefType,
+    propertyRef: trans.propertyRef,
+    languageCode: trans.languageCode,
+    regionCode: trans.regionCode,
+    message: trans.message,
+  }))
+
+  addDatatypeGetter('icon', schemas.iconResult, (icon) => ({
+    docId: icon.docId,
+    createdAt: icon.createdAt,
+    updatedAt: icon.updatedAt,
+    deleted: icon.deleted,
+    name: icon.name,
+    variants: icon.variants.map((variant) => {
+      if ('mimeType' in variant && variant.mimeType === 'image/png') {
+        return {
+          mimeType: variant.mimeType,
+          size: variant.size,
+          pixelDensity: variant.pixelDensity,
+          blobVersionId: variant.blobVersionId,
+        }
+      } else {
+        return {
+          mimeType: variant.mimeType,
+          size: variant.size,
+          blobVersionId: variant.blobVersionId,
+        }
+      }
+    }),
+  }))
+
+  addDatatypeGetter('field', schemas.fieldSchema, (field) => ({
+    docId: field.docId,
+    createdAt: field.createdAt,
+    updatedAt: field.updatedAt,
+    deleted: field.deleted,
+    tagKey: field.tagKey,
+    type: field.type,
+    label: field.label,
+    appearance: field.appearance,
+    snakeCase: field.snakeCase,
+    options: field.options,
+    universal: field.universal,
+    placeholder: field.placeholder,
+    helperText: field.helperText,
+  }))
+
+  addDatatypeGetter('preset', schemas.presetResult, (pr) => ({
+    docId: pr.docId,
+    createdAt: pr.createdAt,
+    updatedAt: pr.updatedAt,
+    deleted: pr.deleted,
+    name: pr.name,
+    geometry: pr.geometry,
+    tags: pr.tags,
+    addTags: pr.addTags,
+    removeTags: pr.removeTags,
+    fieldRefs: pr.fieldRefs,
+    iconRef: pr.iconRef,
+    terms: pr.terms,
+    color: pr.color,
+  }))
+
   function addDatatypeGetter(dataType, responseSchema, mapDoc = (doc) => doc) {
     fastify.get(
       `/projects/:projectPublicId/${dataType}s`,
