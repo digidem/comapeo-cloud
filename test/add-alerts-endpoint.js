@@ -1,6 +1,6 @@
 import { MapeoManager } from '@comapeo/core'
 import { keyToPublicId as projectKeyToPublicId } from '@mapeo/crypto'
-import Ajv from 'ajv'
+import { Value } from '@sinclair/typebox/value'
 
 import assert from 'node:assert/strict'
 import test from 'node:test'
@@ -124,13 +124,13 @@ test('returns a 400 if trying to add invalid alerts', async (t) => {
     ]),
   ]
 
-  const ajv = new Ajv()
-  const validate = ajv.compile(remoteDetectionAlertToAdd)
-
   await Promise.all(
     badAlerts.map(async (badAlert) => {
       const body = JSON.stringify(badAlert)
-      assert(!validate(badAlert), `test setup: ${body} should be invalid`)
+      assert(
+        !Value.Check(remoteDetectionAlertToAdd, body),
+        `test setup: ${body} should be invalid`,
+      )
 
       const response = await server.inject({
         method: 'POST',

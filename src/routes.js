@@ -1,5 +1,6 @@
 import { replicateProject } from '@comapeo/core'
 import { keyToPublicId as projectKeyToPublicId } from '@mapeo/crypto'
+import { Type } from '@sinclair/typebox'
 import timingSafeEqual from 'string-timing-safe-equal'
 
 import assert from 'node:assert/strict'
@@ -16,10 +17,7 @@ import { wsCoreReplicator } from './ws-core-replicator.js'
 const BEARER_SPACE_LENGTH = 'Bearer '.length
 
 const BASE32_REGEX_32_BYTES = '^[0-9A-Za-z]{52}$'
-const BASE32_STRING_32_BYTES = {
-  type: 'string',
-  pattern: BASE32_REGEX_32_BYTES,
-}
+const BASE32_STRING_32_BYTES = Type.String({ pattern: BASE32_REGEX_32_BYTES })
 
 const INDEX_HTML_PATH = new URL('./static/index.html', import.meta.url)
 
@@ -86,22 +84,12 @@ export default async function routes(
     {
       schema: {
         response: {
-          200: {
-            type: 'object',
-            properties: {
-              data: {
-                type: 'object',
-                properties: {
-                  deviceId: {
-                    type: 'string',
-                  },
-                  name: {
-                    type: 'string',
-                  },
-                },
-              },
-            },
-          },
+          200: Type.Object({
+            data: Type.Object({
+              deviceId: Type.String(),
+              name: Type.String(),
+            }),
+          }),
         },
       },
     },
@@ -121,21 +109,14 @@ export default async function routes(
     {
       schema: {
         response: {
-          200: {
-            type: 'object',
-            properties: {
-              data: {
-                type: 'array',
-                items: {
-                  type: 'object',
-                  properties: {
-                    projectId: { type: 'string' },
-                    name: { type: 'string', nullable: true },
-                  },
-                },
-              },
-            },
-          },
+          200: Type.Object({
+            data: Type.Array(
+              Type.Object({
+                projectId: Type.String(),
+                name: Type.Optional(Type.String()),
+              }),
+            ),
+          }),
           '4xx': schemas.errorResponse,
         },
       },
@@ -163,17 +144,11 @@ export default async function routes(
       schema: {
         body: schemas.projectToAdd,
         response: {
-          200: {
-            type: 'object',
-            properties: {
-              data: {
-                type: 'object',
-                properties: {
-                  deviceId: schemas.HEX_STRING_32_BYTES,
-                },
-              },
-            },
-          },
+          200: Type.Object({
+            data: Type.Object({
+              deviceId: schemas.HEX_STRING_32_BYTES,
+            }),
+          }),
           400: schemas.errorResponse,
         },
       },
@@ -268,12 +243,9 @@ export default async function routes(
     '/sync/:projectPublicId',
     {
       schema: {
-        params: {
-          type: 'object',
-          properties: {
-            projectPublicId: BASE32_STRING_32_BYTES,
-          },
-        },
+        params: Type.Object({
+          projectPublicId: BASE32_STRING_32_BYTES,
+        }),
         response: {
           '4xx': schemas.errorResponse,
         },
@@ -400,23 +372,13 @@ export default async function routes(
       `/projects/:projectPublicId/${dataType}s`,
       {
         schema: {
-          params: {
-            type: 'object',
-            properties: {
-              projectPublicId: BASE32_STRING_32_BYTES,
-            },
-          },
+          params: Type.Object({
+            projectPublicId: BASE32_STRING_32_BYTES,
+          }),
           response: {
-            200: {
-              type: 'object',
-              properties: {
-                data: {
-                  type: 'array',
-                  items: responseSchema,
-                },
-              },
-              required: ['data'],
-            },
+            200: Type.Object({
+              data: Type.Array(responseSchema),
+            }),
             '4xx': schemas.errorResponse,
           },
         },
@@ -444,23 +406,13 @@ export default async function routes(
     '/projects/:projectPublicId/remoteDetectionAlerts',
     {
       schema: {
-        params: {
-          type: 'object',
-          properties: {
-            projectPublicId: BASE32_STRING_32_BYTES,
-          },
-        },
+        params: Type.Object({
+          projectPublicId: BASE32_STRING_32_BYTES,
+        }),
         response: {
-          200: {
-            type: 'object',
-            properties: {
-              data: {
-                type: 'array',
-                items: schemas.remoteDetectionAlertResult,
-              },
-            },
-            required: ['data'],
-          },
+          200: Type.Object({
+            data: Type.Array(schemas.remoteDetectionAlertResult),
+          }),
           '4xx': schemas.errorResponse,
         },
       },
@@ -498,15 +450,12 @@ export default async function routes(
     '/projects/:projectPublicId/remoteDetectionAlerts',
     {
       schema: {
-        params: {
-          type: 'object',
-          properties: {
-            projectPublicId: BASE32_STRING_32_BYTES,
-          },
-        },
+        params: Type.Object({
+          projectPublicId: BASE32_STRING_32_BYTES,
+        }),
         body: schemas.remoteDetectionAlertToAdd,
         response: {
-          201: { type: 'string', const: '' },
+          201: Type.Literal(''),
           '4xx': schemas.errorResponse,
         },
       },
@@ -535,30 +484,28 @@ export default async function routes(
     '/projects/:projectPublicId/attachments/:driveDiscoveryId/:type/:name',
     {
       schema: {
-        params: {
-          type: 'object',
-          properties: {
-            projectPublicId: BASE32_STRING_32_BYTES,
-            driveDiscoveryId: { type: 'string' },
-            type: {
-              type: 'string',
-              enum: [...SUPPORTED_ATTACHMENT_TYPES],
-            },
-            name: { type: 'string' },
-          },
-        },
-        querystring: {
-          type: 'object',
-          properties: {
-            variant: {
-              // Not all of these are valid for all attachment types.
-              // For example, you can't get an audio's thumbnail.
-              // We do additional checking later to verify validity.
-              enum: ['original', 'preview', 'thumbnail'],
-              type: 'string',
-            },
-          },
-        },
+        params: Type.Object({
+          projectPublicId: BASE32_STRING_32_BYTES,
+          driveDiscoveryId: Type.String(),
+          type: Type.Union(
+            [...SUPPORTED_ATTACHMENT_TYPES].map((attachmentType) =>
+              Type.Literal(attachmentType),
+            ),
+          ),
+          name: Type.String(),
+        }),
+        querystring: Type.Object({
+          variant: Type.Optional(
+            // Not all of these are valid for all attachment types.
+            // For example, you can't get an audio's thumbnail.
+            // We do additional checking later to verify validity.
+            Type.Union([
+              Type.Literal('original'),
+              Type.Literal('preview'),
+              Type.Literal('thumbnail'),
+            ]),
+          ),
+        }),
         response: {
           200: {},
           '4xx': schemas.errorResponse,
