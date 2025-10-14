@@ -268,19 +268,36 @@ export default async function routes(
       project.$sync.start()
     },
   )
-  // addDatatypeGetter('observation', docSchemas.observation, (obs, req) => ({
-  //   ...obs,
-  //   attachments: obs.attachments
-  //     .filter((attachment) =>
-  //       SUPPORTED_ATTACHMENT_TYPES.has(/** @type {any} */ (attachment.type)),
-  //     )
-  //     .map((attachment) => ({
-  //       url: new URL(
-  //         `projects/${req.params.projectPublicId}/attachments/${attachment.driveDiscoveryId}/${attachment.type}/${attachment.name}`,
-  //         req.baseUrl,
-  //       ).href,
-  //     })),
-  // }))
+
+  const observationSchema = {
+    ...docSchemas.observation,
+    properties: {
+      ...docSchemas.observation.properties,
+      attachments: {
+        ...docSchemas.observation.properties.attachments,
+        items: {
+          type: 'object',
+          properties: {
+            url: { type: 'string' },
+          },
+        },
+      },
+    },
+  }
+
+  addDatatypeGetter('observation', observationSchema, (obs, req) => ({
+    ...obs,
+    attachments: obs.attachments
+      .filter((attachment) =>
+        SUPPORTED_ATTACHMENT_TYPES.has(/** @type {any} */ (attachment.type)),
+      )
+      .map((attachment) => ({
+        url: new URL(
+          `projects/${req.params.projectPublicId}/attachments/${attachment.driveDiscoveryId}/${attachment.type}/${attachment.name}`,
+          req.baseUrl,
+        ).href,
+      })),
+  }))
 
   /*
 Desired behavior:
