@@ -1,4 +1,5 @@
 import { replicateProject } from '@comapeo/core'
+import { dereferencedDocSchemas as docSchemas } from '@comapeo/schema'
 import { keyToPublicId as projectKeyToPublicId } from '@mapeo/crypto'
 import { Type } from '@sinclair/typebox'
 import timingSafeEqual from 'string-timing-safe-equal'
@@ -13,6 +14,7 @@ import { wsCoreReplicator } from './ws-core-replicator.js'
 
 /** @import { FastifyInstance, FastifyPluginAsync, FastifyRequest, RawServerDefault } from 'fastify' */
 /** @import { TypeBoxTypeProvider } from '@fastify/type-provider-typebox' */
+/** @import { Observation, Track, Preset } from '@comapeo/schema' */
 
 const BEARER_SPACE_LENGTH = 'Bearer '.length
 
@@ -266,108 +268,56 @@ export default async function routes(
       project.$sync.start()
     },
   )
+  // addDatatypeGetter('observation', docSchemas.observation, (obs, req) => ({
+  //   ...obs,
+  //   attachments: obs.attachments
+  //     .filter((attachment) =>
+  //       SUPPORTED_ATTACHMENT_TYPES.has(/** @type {any} */ (attachment.type)),
+  //     )
+  //     .map((attachment) => ({
+  //       url: new URL(
+  //         `projects/${req.params.projectPublicId}/attachments/${attachment.driveDiscoveryId}/${attachment.type}/${attachment.name}`,
+  //         req.baseUrl,
+  //       ).href,
+  //     })),
+  // }))
 
-  addDatatypeGetter('observation', schemas.observationResult, (obs, req) => ({
-    docId: obs.docId,
-    createdAt: obs.createdAt,
-    updatedAt: obs.updatedAt,
-    deleted: obs.deleted,
-    lat: obs.lat,
-    lon: obs.lon,
-    attachments: obs.attachments
-      .filter((attachment) =>
-        SUPPORTED_ATTACHMENT_TYPES.has(/** @type {any} */ (attachment.type)),
-      )
-      .map((attachment) => ({
-        url: new URL(
-          `projects/${req.params.projectPublicId}/attachments/${attachment.driveDiscoveryId}/${attachment.type}/${attachment.name}`,
-          req.baseUrl,
-        ).href,
-      })),
-    tags: obs.tags,
-  }))
+  /*
+Desired behavior:
+- addDataTypeGetter takes a generic InputType, OutputType that defaults to InputType
+- Also takes a schema for the OutputType (JSON schema from comapeo/schema)
+- The MapDoc function will be called for docs in the datatype, and either yield the doc
+or add some more fields that conform to the OutputType and the schema
 
-  addDatatypeGetter('track', schemas.trackResult, (track) => ({
-    docId: track.docId,
-    createdAt: track.createdAt,
-    updatedAt: track.updatedAt,
-    deleted: track.deleted,
-    locations: track.locations,
-    observationRefs: track.observationRefs,
-    tags: track.tags,
-    presetRef: track.presetRef,
-  }))
+Issues:
+- I think our schemas aren't valid for the AJV JSONSchemaType?
+- Types giving errors:
+> InputType' could be instantiated with an arbitrary type which could be unrelated to '({ schemaName: "track";
+> Property 'nullable' is missing in type '{ readonly description: "Must be `track`"; 
+*/
 
-  addDatatypeGetter('translation', schemas.translationResult, (trans) => ({
-    docId: trans.docId,
-    createdAt: trans.createdAt,
-    updatedAt: trans.updatedAt,
-    deleted: trans.deleted,
-    docRef: trans.docRef,
-    docRefType: trans.docRefType,
-    propertyRef: trans.propertyRef,
-    languageCode: trans.languageCode,
-    regionCode: trans.regionCode,
-    message: trans.message,
-  }))
+  /** @type {typeof addDatatypeGetter<Track>} */
+  addDatatypeGetter(
+    'track',
+    docSchemas.track,
+    (doc /** @type {Track} */) => doc,
+  )
 
-  addDatatypeGetter('icon', schemas.iconResult, (icon) => ({
-    docId: icon.docId,
-    createdAt: icon.createdAt,
-    updatedAt: icon.updatedAt,
-    deleted: icon.deleted,
-    name: icon.name,
-    variants: icon.variants.map((variant) => {
-      if ('mimeType' in variant && variant.mimeType === 'image/png') {
-        return {
-          mimeType: variant.mimeType,
-          size: variant.size,
-          pixelDensity: variant.pixelDensity,
-          blobVersionId: variant.blobVersionId,
-        }
-      } else {
-        return {
-          mimeType: variant.mimeType,
-          size: variant.size,
-          blobVersionId: variant.blobVersionId,
-        }
-      }
-    }),
-  }))
+  //  addDatatypeGetter('preset', docSchemas.preset, (doc) => doc)
 
-  addDatatypeGetter('field', schemas.fieldSchema, (field) => ({
-    docId: field.docId,
-    createdAt: field.createdAt,
-    updatedAt: field.updatedAt,
-    deleted: field.deleted,
-    tagKey: field.tagKey,
-    type: field.type,
-    label: field.label,
-    appearance: field.appearance,
-    snakeCase: field.snakeCase,
-    options: field.options,
-    universal: field.universal,
-    placeholder: field.placeholder,
-    helperText: field.helperText,
-  }))
+  // TODO: Expose these datatypes on MapeoProject?
+  // addDatatypeGetter('translation', docSchemas.translation)
+  // addDatatypeGetter('icon', docSchemas.icon)
+  // addDatatypeGetter('field', docSchemas.field)
 
-  addDatatypeGetter('preset', schemas.presetResult, (pr) => ({
-    docId: pr.docId,
-    createdAt: pr.createdAt,
-    updatedAt: pr.updatedAt,
-    deleted: pr.deleted,
-    name: pr.name,
-    geometry: pr.geometry,
-    tags: pr.tags,
-    addTags: pr.addTags,
-    removeTags: pr.removeTags,
-    fieldRefs: pr.fieldRefs,
-    iconRef: pr.iconRef,
-    terms: pr.terms,
-    color: pr.color,
-  }))
-
-  function addDatatypeGetter(dataType, responseSchema, mapDoc = (doc) => doc) {
+  /**
+   * @template InputType
+   * @template OutputType=InputType
+   * @param {"track"|"observation"|"preset"} dataType - DataType to pull from
+   * @param {import('ajv').JSONSchemaType<OutputType>} responseSchema - Schema for the response data
+   * @param {function(InputType, FastifyRequest): OutputType} mapDoc - Add / remove fields
+   */
+  function addDatatypeGetter(dataType, responseSchema, mapDoc) {
     fastify.get(
       `/projects/:projectPublicId/${dataType}s`,
       {
@@ -376,9 +326,15 @@ export default async function routes(
             projectPublicId: BASE32_STRING_32_BYTES,
           }),
           response: {
-            200: Type.Object({
-              data: Type.Array(responseSchema),
-            }),
+            200: {
+              type: 'object',
+              properties: {
+                data: {
+                  type: 'array',
+                  items: responseSchema,
+                },
+              },
+            },
             '4xx': schemas.errorResponse,
           },
         },
