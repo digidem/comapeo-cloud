@@ -1,5 +1,4 @@
 import { replicateProject } from '@comapeo/core'
-import { dereferencedDocSchemas as docSchemas } from '@comapeo/schema'
 import { keyToPublicId as projectKeyToPublicId } from '@mapeo/crypto'
 import { Type } from '@sinclair/typebox'
 import timingSafeEqual from 'string-timing-safe-equal'
@@ -8,13 +7,15 @@ import assert from 'node:assert/strict'
 import * as fs from 'node:fs'
 import { STATUS_CODES } from 'node:http'
 
+import { Observation as observationSchema } from './datatypes/observation.js'
+import { Track as trackSchema } from './datatypes/track.js'
 import * as errors from './errors.js'
 import * as schemas from './schemas.js'
 import { wsCoreReplicator } from './ws-core-replicator.js'
 
 /** @import { FastifyInstance, FastifyPluginAsync, FastifyRequest, RawServerDefault } from 'fastify' */
 /** @import { TypeBoxTypeProvider } from '@fastify/type-provider-typebox' */
-/** @import { Observation, Track, Preset } from '@comapeo/schema' */
+/** @import { Observation, Track, Preset, MapeoDoc } from '@comapeo/schema' */
 
 const BEARER_SPACE_LENGTH = 'Bearer '.length
 
@@ -269,56 +270,25 @@ export default async function routes(
     },
   )
 
-  const observationSchema = {
-    ...docSchemas.observation,
-    properties: {
-      ...docSchemas.observation.properties,
-      attachments: {
-        ...docSchemas.observation.properties.attachments,
-        items: {
-          type: 'object',
-          properties: {
-            url: { type: 'string' },
-          },
-        },
-      },
-    },
-  }
-
-  addDatatypeGetter('observation', observationSchema, (obs, req) => ({
-    ...obs,
-    attachments: obs.attachments
-      .filter((attachment) =>
-        SUPPORTED_ATTACHMENT_TYPES.has(/** @type {any} */ (attachment.type)),
-      )
-      .map((attachment) => ({
-        url: new URL(
-          `projects/${req.params.projectPublicId}/attachments/${attachment.driveDiscoveryId}/${attachment.type}/${attachment.name}`,
-          req.baseUrl,
-        ).href,
-      })),
-  }))
-
-  /*
-Desired behavior:
-- addDataTypeGetter takes a generic InputType, OutputType that defaults to InputType
-- Also takes a schema for the OutputType (JSON schema from comapeo/schema)
-- The MapDoc function will be called for docs in the datatype, and either yield the doc
-or add some more fields that conform to the OutputType and the schema
-
-Issues:
-- I think our schemas aren't valid for the AJV JSONSchemaType?
-- Types giving errors:
-> InputType' could be instantiated with an arbitrary type which could be unrelated to '({ schemaName: "track";
-> Property 'nullable' is missing in type '{ readonly description: "Must be `track`"; 
-*/
-
-  /** @type {typeof addDatatypeGetter<Track>} */
   addDatatypeGetter(
-    'track',
-    docSchemas.track,
-    (doc /** @type {Track} */) => doc,
+    'observation',
+    observationSchema,
+    (obs, { projectPublicId, baseUrl }) => ({
+      ...obs,
+      attachments: obs.attachments
+        .filter((attachment) =>
+          SUPPORTED_ATTACHMENT_TYPES.has(/** @type {any} */ (attachment.type)),
+        )
+        .map((attachment) => ({
+          url: new URL(
+            `projects/${projectPublicId}/attachments/${attachment.driveDiscoveryId}/${attachment.type}/${attachment.name}`,
+            baseUrl,
+          ).href,
+        })),
+    }),
   )
+
+  addDatatypeGetter('track', trackSchema, (doc) => doc)
 
   //  addDatatypeGetter('preset', docSchemas.preset, (doc) => doc)
 
@@ -328,11 +298,16 @@ Issues:
   // addDatatypeGetter('field', docSchemas.field)
 
   /**
-   * @template InputType
-   * @template OutputType=InputType
-   * @param {"track"|"observation"|"preset"} dataType - DataType to pull from
-   * @param {import('ajv').JSONSchemaType<OutputType>} responseSchema - Schema for the response data
-   * @param {function(InputType, FastifyRequest): OutputType} mapDoc - Add / remove fields
+   * @template {MapeoDoc['schemaName']} TSchemaName
+   * @typedef {Extract<MapeoDoc, { schemaName: TSchemaName }>} GetMapeoDoc
+   */
+
+  /**
+   * @template {import('@sinclair/typebox').TSchema} TSchema
+   * @template {"track"|"observation"|"preset"} [TDataType]
+   * @param {TDataType} dataType - DataType to pull from
+   * @param {TSchema} responseSchema - Schema for the response data
+   * @param {(doc: GetMapeoDoc<TDataType>, req: {baseUrl: URL, projectPublicId: string}) => import('@sinclair/typebox').Static<TSchema>} mapDoc - Add / remove fields
    */
   function addDatatypeGetter(dataType, responseSchema, mapDoc) {
     fastify.get(
@@ -368,7 +343,12 @@ Issues:
         const project = await this.comapeo.getProject(projectPublicId)
         const data = (
           await project[dataType].getMany({ includeDeleted: true })
-        ).map((doc) => mapDoc(doc, req))
+        ).map((doc) =>
+          mapDoc(doc, {
+            projectPublicId: req.params.projectPublicId,
+            baseUrl: req.baseUrl,
+          }),
+        )
 
         return { data }
       },
