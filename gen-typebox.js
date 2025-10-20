@@ -23,21 +23,16 @@ const observationSchema = extendProperties(originals.observation, {
       },
     },
   },
-  tags: deleteProperties(originals.observation.properties.tags),
   // We add URLs to various `ref` fields inline with how attachments get URLs
   presetRef: addUrlField(originals.observation.properties.presetRef),
 })
 
 const presetSchema = extendProperties(originals.preset, {
-  tags: deleteProperties(originals.preset.properties.tags),
-  addTags: deleteProperties(originals.preset.properties.addTags),
-  removeTags: deleteProperties(originals.preset.properties.removeTags),
   fieldRefs: addUrlFieldArray(originals.preset.properties.fieldRefs),
   iconRef: addUrlField(originals.preset.properties.iconRef),
 })
 
 const trackSchema = extendProperties(originals.track, {
-  tags: deleteProperties(originals.track.properties.tags),
   observationRefs: addUrlFieldArray(originals.track.properties.observationRefs),
   presetRef: addUrlField(originals.track.properties.presetRef),
 })
@@ -97,20 +92,6 @@ function extendProperties(schema, properties) {
       ...schema.properties,
       ...properties,
     },
-  }
-}
-
-/**
- * Deletes the 'properties' field from the given schema.
- *
- * @param {Record<string, any>} schema - The original schema object with a 'properties' field.
- * @returns {Omit<Record<string, any>, 'properties'>} - A new schema object without the 'properties' field.
- */
-function deleteProperties(schema) {
-  return {
-    ...schema,
-    // eslint-disable-next-line no-undefined
-    properties: undefined,
   }
 }
 
