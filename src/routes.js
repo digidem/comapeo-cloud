@@ -7,7 +7,9 @@ import assert from 'node:assert/strict'
 import * as fs from 'node:fs'
 import { STATUS_CODES } from 'node:http'
 
+import { Field as fieldSchema } from './datatypes/field.js'
 import { Observation as observationSchema } from './datatypes/observation.js'
+import { Preset as presetSchema } from './datatypes/preset.js'
 import { Track as trackSchema } from './datatypes/track.js'
 import * as errors from './errors.js'
 import * as schemas from './schemas.js'
@@ -15,7 +17,26 @@ import { wsCoreReplicator } from './ws-core-replicator.js'
 
 /** @import { FastifyInstance, FastifyPluginAsync, FastifyRequest, RawServerDefault } from 'fastify' */
 /** @import { TypeBoxTypeProvider } from '@fastify/type-provider-typebox' */
-/** @import { Observation, Track, Preset, MapeoDoc } from '@comapeo/schema' */
+/** @import { MapeoDoc } from '@comapeo/schema' */
+/** @import { MapeoProject } from '@comapeo/core/dist/mapeo-project.js' */
+/** @import {Static, TSchema} from '@sinclair/typebox' */
+
+/**
+ * @template {MapeoDoc['schemaName']} TSchemaName
+ * @typedef {Extract<MapeoDoc, { schemaName: TSchemaName }>} GetMapeoDoc
+ */
+
+/**
+ * @typedef {{baseUrl: URL, projectPublicId: string, project: MapeoProject}} MapDocParam
+ */
+
+/**
+ * @typedef {{docId: string, versionId: string}} Ref
+ */
+
+/**
+ * @typedef {{docId: string, versionId: string, url: string}} UrlRef
+ */
 
 const BEARER_SPACE_LENGTH = 'Bearer '.length
 
@@ -270,10 +291,66 @@ export default async function routes(
     },
   )
 
+  addDatatypeGetter('observation', observationSchema, setAttachmentURL)
+  // TODO: backwards compat, remove this in next major release
   addDatatypeGetter(
     'observation',
     observationSchema,
-    (obs, { projectPublicId, baseUrl }) => ({
+    setAttachmentURL,
+    'observations',
+  )
+  addDatatypeGetter('track', trackSchema, (track, { projectPublicId }) => ({
+    ...track,
+    presetRef: expandRef(track.presetRef, 'preset', projectPublicId),
+    observationRefs: expandManyRefs(
+      track.observationRefs,
+      'observation',
+      projectPublicId,
+    ),
+  }))
+  addDatatypeGetter('preset', presetSchema, (preset, { projectPublicId }) => ({
+    ...preset,
+    fieldRefs: expandManyRefs(preset.fieldRefs, 'field', projectPublicId),
+    iconRef: expandRef(preset.iconRef, 'icon', projectPublicId),
+  }))
+  addDatatypeGetter('field', fieldSchema, (doc) => doc)
+
+  /**
+   * @param {Ref | undefined} ref
+   * @param {string} dataType
+   * @param {string} projectPublicId
+   * @returns {UrlRef | undefined}
+   */
+  function expandRef(ref, dataType, projectPublicId) {
+    if (!ref) return ref
+    return {
+      ...ref,
+      url: `projects/${projectPublicId}/${dataType}/${ref.docId}`,
+    }
+  }
+
+  /**
+   * @param {Ref[] | undefined} refs
+   * @param {string} dataType
+   * @param {string} projectPublicId
+   * @returns {UrlRef[]}
+   */
+  function expandManyRefs(refs, dataType, projectPublicId) {
+    if (!refs) return []
+    return refs.map((ref) => ({
+      ...ref,
+      url: `projects/${projectPublicId}/${dataType}/${ref.docId}`,
+    }))
+  }
+
+  /**
+   *
+   * @param {GetMapeoDoc<"observation">} obs
+   * @param {*} param1
+   * @returns {Static<observationSchema>}
+   */
+  function setAttachmentURL(obs, { projectPublicId, baseUrl }) {
+    return {
       ...obs,
       attachments: obs.attachments
         .filter((attachment) =>
@@ -285,33 +362,26 @@ export default async function routes(
             baseUrl,
           ).href,
         })),
-    }),
-  )
-
-  addDatatypeGetter('track', trackSchema, (doc) => doc)
-
-  //  addDatatypeGetter('preset', docSchemas.preset, (doc) => doc)
-
-  // TODO: Expose these datatypes on MapeoProject?
-  // addDatatypeGetter('translation', docSchemas.translation)
-  // addDatatypeGetter('icon', docSchemas.icon)
-  // addDatatypeGetter('field', docSchemas.field)
-
-  /**
-   * @template {MapeoDoc['schemaName']} TSchemaName
-   * @typedef {Extract<MapeoDoc, { schemaName: TSchemaName }>} GetMapeoDoc
-   */
+      presetRef: expandRef(obs.presetRef, 'preset', projectPublicId),
+    }
+  }
 
   /**
    * @template {import('@sinclair/typebox').TSchema} TSchema
-   * @template {"track"|"observation"|"preset"} TDataType
+   * @template {"track"|"observation"|"preset"|"field"} TDataType
    * @param {TDataType} dataType - DataType to pull from
    * @param {TSchema} responseSchema - Schema for the response data
-   * @param {(doc: GetMapeoDoc<TDataType>, req: {baseUrl: URL, projectPublicId: string}) => import('@sinclair/typebox').Static<TSchema>} mapDoc - Add / remove fields
+   * @param {(doc: GetMapeoDoc<TDataType>, req: MapDocParam) => Static<TSchema>|Promise<TSchema>} mapDoc - Add / remove fields
+   * @param {string} [typeRoute] - Route to mount the getters under. Defaults to the dataType
    */
-  function addDatatypeGetter(dataType, responseSchema, mapDoc) {
+  function addDatatypeGetter(
+    dataType,
+    responseSchema,
+    mapDoc,
+    typeRoute = dataType,
+  ) {
     fastify.get(
-      `/projects/:projectPublicId/${dataType}s`,
+      `/projects/:projectPublicId/${typeRoute}`,
       {
         schema: {
           params: Type.Object({
@@ -344,12 +414,61 @@ export default async function routes(
 
         const datatype = project[dataType]
 
-        const data = (await datatype.getMany({ includeDeleted: true })).map(
-          (doc) =>
+        const data = await Promise.all(
+          (await datatype.getMany({ includeDeleted: true })).map((doc) =>
             mapDoc(/** @type {GetMapeoDoc<TDataType>}*/ (doc), {
-              projectPublicId: req.params.projectPublicId,
+              projectPublicId,
+              project,
               baseUrl: req.baseUrl,
             }),
+          ),
+        )
+
+        return { data }
+      },
+    )
+
+    fastify.get(
+      `/projects/:projectPublicId/${typeRoute}/:docId`,
+      {
+        schema: {
+          params: Type.Object({
+            projectPublicId: BASE32_STRING_32_BYTES,
+            docId: BASE32_STRING_32_BYTES,
+          }),
+          response: {
+            200: {
+              type: 'object',
+              properties: {
+                data: responseSchema,
+              },
+            },
+            '4xx': schemas.errorResponse,
+          },
+        },
+        async preHandler(req) {
+          verifyBearerAuth(req)
+          await ensureProjectExists(this, req)
+        },
+      },
+      /**
+       * @this {FastifyInstance}
+       */
+      async function (req) {
+        const { projectPublicId, docId } = req.params
+        const project = await this.comapeo.getProject(projectPublicId)
+
+        const datatype = project[dataType]
+
+        const rawData = await datatype.getByDocId(docId)
+
+        const data = await mapDoc(
+          /** @type {GetMapeoDoc<TDataType>}*/ (rawData),
+          {
+            projectPublicId,
+            project,
+            baseUrl: req.baseUrl,
+          },
         )
 
         return { data }
@@ -432,6 +551,54 @@ export default async function routes(
       })
 
       reply.status(201).send()
+    },
+  )
+
+  fastify.get(
+    `/projects/:projectPublicId/icon/:docId`,
+    {
+      schema: {
+        params: Type.Object({
+          projectPublicId: BASE32_STRING_32_BYTES,
+          docId: BASE32_STRING_32_BYTES,
+        }),
+        querystring: Type.Object({
+          variant: Type.Optional(
+            Type.Union([
+              Type.Literal('small'),
+              Type.Literal('medium'),
+              Type.Literal('large'),
+            ]),
+          ),
+        }),
+        response: {
+          200: {},
+          '4xx': schemas.errorResponse,
+        },
+      },
+      async preHandler(req) {
+        verifyBearerAuth(req)
+        await ensureProjectExists(this, req)
+      },
+    },
+    /**
+     * @this {FastifyInstance}
+     */
+    async function (req, reply) {
+      const { projectPublicId, docId } = req.params
+      const variant = req.query.variant ?? 'medium'
+      const project = await this.comapeo.getProject(projectPublicId)
+      const iconUrl = await project.$icons.getIconUrl(docId, {
+        mimeType: 'image/svg+xml',
+        size: variant,
+      })
+
+      const proxiedResponse = await fetch(iconUrl)
+      reply.code(proxiedResponse.status)
+      for (const [headerName, headerValue] of proxiedResponse.headers) {
+        reply.header(headerName, headerValue)
+      }
+      return reply.send(proxiedResponse.body)
     },
   )
 

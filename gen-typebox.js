@@ -1,72 +1,49 @@
-import { dereferencedDocSchemas } from '@comapeo/schema'
+import { dereferencedDocSchemas as originals } from '@comapeo/schema'
 import { schema2typebox } from 'schema2typebox'
 import * as ts from 'typescript'
 
 import { mkdir, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 
-const TO_GEN = ['observation', 'track', 'preset', 'field', 'icon']
+const TO_GEN = ['observation', 'track', 'preset', 'field']
 
-const observationSchema = {
-  ...dereferencedDocSchemas.observation,
-  properties: {
-    ...dereferencedDocSchemas.observation.properties,
-    attachments: {
-      type: 'array',
-      items: {
-        type: 'object',
-        properties: {
-          url: {
-            type: 'string',
-            description: 'Path to fetching attachment data',
-          },
+// We extend the schema instead of assigning values to a clone
+// because JSDoc has no clean way to mark nested trees as mutable
+
+const observationSchema = extendProperties(originals.observation, {
+  attachments: {
+    type: 'array',
+    items: {
+      type: 'object',
+      properties: {
+        url: {
+          type: 'string',
+          description: 'Path to fetching attachment data',
         },
       },
     },
-    tags: {
-      ...dereferencedDocSchemas.observation.properties.tags,
-      // eslint-disable-next-line no-undefined
-      properties: undefined,
-    },
   },
-}
+  tags: deleteProperties(originals.observation.properties.tags),
+  // We add URLs to various `ref` fields inline with how attachments get URLs
+  presetRef: addUrlField(originals.observation.properties.presetRef),
+})
 
-const presetSchema = {
-  ...dereferencedDocSchemas.preset,
-  properties: {
-    ...dereferencedDocSchemas.preset.properties,
-    tags: {
-      ...dereferencedDocSchemas.preset.properties.tags,
-      // eslint-disable-next-line no-undefined
-      properties: undefined,
-    },
-    addTags: {
-      ...dereferencedDocSchemas.preset.properties.addTags,
-      // eslint-disable-next-line no-undefined
-      properties: undefined,
-    },
-    removeTags: {
-      ...dereferencedDocSchemas.preset.properties.removeTags,
-      // eslint-disable-next-line no-undefined
-      properties: undefined,
-    },
-  },
-}
+const presetSchema = extendProperties(originals.preset, {
+  tags: deleteProperties(originals.preset.properties.tags),
+  addTags: deleteProperties(originals.preset.properties.addTags),
+  removeTags: deleteProperties(originals.preset.properties.removeTags),
+  fieldRefs: addUrlFieldArray(originals.preset.properties.fieldRefs),
+  iconRef: addUrlField(originals.preset.properties.iconRef),
+})
 
-const trackSchema = {
-  ...dereferencedDocSchemas.track,
-  properties: {
-    ...dereferencedDocSchemas.track.properties,
-    tags: {
-      ...dereferencedDocSchemas.track.properties.tags,
-      // eslint-disable-next-line no-undefined
-      properties: undefined,
-    },
-  },
-}
+const trackSchema = extendProperties(originals.track, {
+  tags: deleteProperties(originals.track.properties.tags),
+  observationRefs: addUrlFieldArray(originals.track.properties.observationRefs),
+  presetRef: addUrlField(originals.track.properties.presetRef),
+})
 
 const schemas = {
-  ...dereferencedDocSchemas,
+  ...originals,
   observation: observationSchema,
   preset: presetSchema,
   track: trackSchema,
@@ -105,3 +82,66 @@ await Promise.all(
     console.log(name, 'done!')
   }),
 )
+
+/**
+ * Extends the properties of a schema with new properties.
+ *
+ * @param {Record<string, any>} schema - The original schema.
+ * @param {Record<string, any>} properties - New properties to extend the schema with.
+ * @returns {Record<string, any>} - The extended schema with additional properties.
+ */
+function extendProperties(schema, properties) {
+  return {
+    ...schema,
+    properties: {
+      ...schema.properties,
+      ...properties,
+    },
+  }
+}
+
+/**
+ * Deletes the 'properties' field from the given schema.
+ *
+ * @param {Record<string, any>} schema - The original schema object with a 'properties' field.
+ * @returns {Omit<Record<string, any>, 'properties'>} - A new schema object without the 'properties' field.
+ */
+function deleteProperties(schema) {
+  return {
+    ...schema,
+    // eslint-disable-next-line no-undefined
+    properties: undefined,
+  }
+}
+
+/**
+ * Adds a URL field to a JSON schema object
+ * @template {object} T
+ * @param {T & { properties: Record<string, unknown>, required?: Readonly<string[]> }} schema - The JSON schema object to extend
+ * @returns {T & { properties: { url: { type: 'string' } } }} The schema with an added url property
+ */
+function addUrlField(schema) {
+  const required = schema.required ? schema.required.concat('url') : ['url']
+
+  return {
+    ...schema,
+    properties: {
+      ...schema.properties,
+      url: { type: 'string' },
+    },
+    required,
+  }
+}
+
+/**
+ * Adds a URL field to the properties of each item in the array within a JSON schema object.
+ * @template {object} T
+ * @param {T & { items: { properties: Record<string, unknown> } }} arraySchema - The JSON schema object with an array as its items to extend
+ * @returns {T & { items: { properties: { url: { type: 'string' } } } }} The schema with a URL field added to each item's properties
+ */
+function addUrlFieldArray(arraySchema) {
+  return {
+    ...arraySchema,
+    items: addUrlField(arraySchema.items),
+  }
+}

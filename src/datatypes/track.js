@@ -85,6 +85,7 @@ export const Track = Type.Object(
             "core discovery id (hex-encoded 32-byte buffer) and core index number, separated by '/'",
           minLength: 1,
         }),
+        url: Type.String(),
       }),
       {
         description:
@@ -121,6 +122,7 @@ export const Track = Type.Object(
               "core discovery id (hex-encoded 32-byte buffer) and core index number, separated by '/'",
             minLength: 1,
           }),
+          url: Type.String(),
         },
         {
           description:

@@ -122,6 +122,7 @@ export const Preset = Type.Object(
             "core discovery id (hex-encoded 32-byte buffer) and core index number, separated by '/'",
           minLength: 1,
         }),
+        url: Type.String(),
       }),
       {
         description: 'References to any fields that this preset is related to.',
@@ -140,6 +141,7 @@ export const Preset = Type.Object(
               "core discovery id (hex-encoded 32-byte buffer) and core index number, separated by '/'",
             minLength: 1,
           }),
+          url: Type.String(),
         },
         {
           description: 'References to the icon that this preset is related to.',
