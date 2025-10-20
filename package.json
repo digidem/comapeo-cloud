@@ -21,6 +21,7 @@
     "build:schemas": "node gen-typebox.js",
     "build": "npm-run-all --serial build:clean build:typescript build:schemas",
     "format": "prettier --write .",
+    "lint": "npm run test:eslint",
     "test:prettier": "prettier --check .",
     "test:eslint": "eslint .",
     "test:typescript": "tsc --project ./tsconfig.json",

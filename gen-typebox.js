@@ -1,4 +1,4 @@
-import { docSchemas } from '@comapeo/schema'
+import { dereferencedDocSchemas } from '@comapeo/schema'
 import { schema2typebox } from 'schema2typebox'
 import * as ts from 'typescript'
 
@@ -8,24 +8,68 @@ import { join } from 'node:path'
 const TO_GEN = ['observation', 'track', 'preset', 'field', 'icon']
 
 const observationSchema = {
-  ...docSchemas.observation,
-  definitions: {
-    ...docSchemas.observation.definitions,
-    attachment: {
-      type: 'object',
-      properties: {
-        url: {
-          type: 'string',
-          description: 'Path to fetching attachment data',
+  ...dereferencedDocSchemas.observation,
+  properties: {
+    ...dereferencedDocSchemas.observation.properties,
+    attachments: {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: {
+          url: {
+            type: 'string',
+            description: 'Path to fetching attachment data',
+          },
         },
       },
+    },
+    tags: {
+      ...dereferencedDocSchemas.observation.properties.tags,
+      // eslint-disable-next-line no-undefined
+      properties: undefined,
+    },
+  },
+}
+
+const presetSchema = {
+  ...dereferencedDocSchemas.preset,
+  properties: {
+    ...dereferencedDocSchemas.preset.properties,
+    tags: {
+      ...dereferencedDocSchemas.preset.properties.tags,
+      // eslint-disable-next-line no-undefined
+      properties: undefined,
+    },
+    addTags: {
+      ...dereferencedDocSchemas.preset.properties.addTags,
+      // eslint-disable-next-line no-undefined
+      properties: undefined,
+    },
+    removeTags: {
+      ...dereferencedDocSchemas.preset.properties.removeTags,
+      // eslint-disable-next-line no-undefined
+      properties: undefined,
+    },
+  },
+}
+
+const trackSchema = {
+  ...dereferencedDocSchemas.track,
+  properties: {
+    ...dereferencedDocSchemas.track.properties,
+    tags: {
+      ...dereferencedDocSchemas.track.properties.tags,
+      // eslint-disable-next-line no-undefined
+      properties: undefined,
     },
   },
 }
 
 const schemas = {
-  ...docSchemas,
+  ...dereferencedDocSchemas,
   observation: observationSchema,
+  preset: presetSchema,
+  track: trackSchema,
 }
 
 const dataTypesDir = join(import.meta.dirname, './src/datatypes')

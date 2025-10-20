@@ -59,83 +59,56 @@ export const Preset = Type.Object(
         uniqueItems: true,
       },
     ),
-    tags: Type.Object(
-      {},
-      {
-        description:
-          'The tags are used to match the preset to existing map entities. You can match based on multiple tags E.g. if you have existing points with the tags `nature:tree` and `species:oak` then you can add both these tags here in order to match only oak trees.',
-        additionalProperties: {
-          anyOf: [
-            { type: 'boolean' },
-            { type: 'number' },
-            { type: 'string' },
-            { type: 'null' },
-            {
-              type: 'array',
-              items: {
-                anyOf: [
-                  { type: 'boolean' },
-                  { type: 'number' },
-                  { type: 'string' },
-                  { type: 'null' },
-                ],
-              },
-            },
-          ],
-        },
-      },
+    tags: Type.Record(
+      Type.String(),
+      Type.Union([
+        Type.Boolean(),
+        Type.Number(),
+        Type.String(),
+        Type.Null(),
+        Type.Array(
+          Type.Union([
+            Type.Boolean(),
+            Type.Number(),
+            Type.String(),
+            Type.Null(),
+          ]),
+        ),
+      ]),
     ),
-    addTags: Type.Object(
-      {},
-      {
-        description:
-          "Tags that are added when changing to the preset (default is the same value as 'tags')",
-        additionalProperties: {
-          anyOf: [
-            { type: 'boolean' },
-            { type: 'number' },
-            { type: 'string' },
-            { type: 'null' },
-            {
-              type: 'array',
-              items: {
-                anyOf: [
-                  { type: 'boolean' },
-                  { type: 'number' },
-                  { type: 'string' },
-                  { type: 'null' },
-                ],
-              },
-            },
-          ],
-        },
-      },
+    addTags: Type.Record(
+      Type.String(),
+      Type.Union([
+        Type.Boolean(),
+        Type.Number(),
+        Type.String(),
+        Type.Null(),
+        Type.Array(
+          Type.Union([
+            Type.Boolean(),
+            Type.Number(),
+            Type.String(),
+            Type.Null(),
+          ]),
+        ),
+      ]),
     ),
-    removeTags: Type.Object(
-      {},
-      {
-        description:
-          "Tags that are removed when changing to another preset (default is the same value as 'addTags' which in turn defaults to 'tags')",
-        additionalProperties: {
-          anyOf: [
-            { type: 'boolean' },
-            { type: 'number' },
-            { type: 'string' },
-            { type: 'null' },
-            {
-              type: 'array',
-              items: {
-                anyOf: [
-                  { type: 'boolean' },
-                  { type: 'number' },
-                  { type: 'string' },
-                  { type: 'null' },
-                ],
-              },
-            },
-          ],
-        },
-      },
+    removeTags: Type.Record(
+      Type.String(),
+      Type.Union([
+        Type.Boolean(),
+        Type.Number(),
+        Type.String(),
+        Type.Null(),
+        Type.Array(
+          Type.Union([
+            Type.Boolean(),
+            Type.Number(),
+            Type.String(),
+            Type.Null(),
+          ]),
+        ),
+      ]),
     ),
     fieldRefs: Type.Array(
       Type.Object({
@@ -188,31 +161,6 @@ export const Preset = Type.Object(
     $id: 'http://mapeo.world/schemas/preset/v1.json',
     description:
       'Presets define how map entities are displayed to the user. They define the icon used on the map, and the fields / questions shown to the user when they create or edit the entity on the map. The `tags` property of a preset is used to match the preset with observations, nodes, ways and relations. If multiple presets match, the one that matches the most tags is used.',
-    definitions: {
-      tags: {
-        type: 'object',
-        properties: {},
-        additionalProperties: {
-          anyOf: [
-            { type: 'boolean' },
-            { type: 'number' },
-            { type: 'string' },
-            { type: 'null' },
-            {
-              type: 'array',
-              items: {
-                anyOf: [
-                  { type: 'boolean' },
-                  { type: 'number' },
-                  { type: 'string' },
-                  { type: 'null' },
-                ],
-              },
-            },
-          ],
-        },
-      },
-    },
     additionalProperties: false,
   },
 )

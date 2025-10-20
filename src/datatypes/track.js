@@ -91,30 +91,22 @@ export const Track = Type.Object(
           'References to any observations that this track is related to.',
       },
     ),
-    tags: Type.Object(
-      {},
-      {
-        description: 'User-defined key-value pairs relevant to this track',
-        additionalProperties: {
-          anyOf: [
-            { type: 'boolean' },
-            { type: 'number' },
-            { type: 'string' },
-            { type: 'null' },
-            {
-              type: 'array',
-              items: {
-                anyOf: [
-                  { type: 'boolean' },
-                  { type: 'number' },
-                  { type: 'string' },
-                  { type: 'null' },
-                ],
-              },
-            },
-          ],
-        },
-      },
+    tags: Type.Record(
+      Type.String(),
+      Type.Union([
+        Type.Boolean(),
+        Type.Number(),
+        Type.String(),
+        Type.Null(),
+        Type.Array(
+          Type.Union([
+            Type.Boolean(),
+            Type.Number(),
+            Type.String(),
+            Type.Null(),
+          ]),
+        ),
+      ]),
     ),
     presetRef: Type.Optional(
       Type.Object(
@@ -142,40 +134,6 @@ export const Track = Type.Object(
     $id: 'http://mapeo.world/schemas/track/v1.json',
     description:
       'A track is a recording of positions over time, with associated tags, similar to an observation',
-    definitions: {
-      position: {
-        description: 'Position details',
-        type: 'object',
-        required: ['timestamp', 'mocked', 'coords'],
-        properties: {
-          timestamp: {
-            description:
-              'Timestamp (ISO date string) of when the current position was obtained',
-            type: 'string',
-            format: 'date-time',
-          },
-          mocked: {
-            description: '`true` if the position was mocked',
-            type: 'boolean',
-            default: false,
-          },
-          coords: {
-            description:
-              'Position details, should be self explanatory. Units in meters',
-            type: 'object',
-            required: ['latitude', 'longitude'],
-            properties: {
-              latitude: { type: 'number' },
-              longitude: { type: 'number' },
-              altitude: { type: 'number' },
-              heading: { type: 'number' },
-              speed: { type: 'number' },
-              accuracy: { type: 'number' },
-            },
-          },
-        },
-      },
-    },
     additionalProperties: false,
   },
 )

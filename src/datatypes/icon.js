@@ -49,18 +49,6 @@ export const Icon = Type.Object(
     $schema: 'http://json-schema.org/draft-07/schema#',
     $id: 'http://mapeo.world/schemas/icon/v1.json',
     description: 'An Icon represents metadata to retrieve an Icon blob',
-    definitions: {
-      size: {
-        type: 'string',
-        enum: ['size_unspecified', 'small', 'medium', 'large'],
-      },
-      blobVersionId: {
-        description:
-          "Version id of the icon blob. Each id is id (hex-encoded 32 byte buffer) and index number, separated by '/'",
-        type: 'string',
-        minLength: 1,
-      },
-    },
     additionalProperties: false,
   },
 )
