@@ -313,168 +313,7 @@ export default async function routes(
     fieldRefs: expandManyRefs(preset.fieldRefs, 'field', projectPublicId),
     iconRef: expandRef(preset.iconRef, 'icon', projectPublicId),
   }))
-  addDatatypeGetter('field', fieldSchema, (doc) => doc)
-
-  /**
-   * @param {Ref | undefined} ref
-   * @param {string} dataType
-   * @param {string} projectPublicId
-   * @returns {UrlRef | undefined}
-   */
-  function expandRef(ref, dataType, projectPublicId) {
-    if (!ref) return ref
-    return {
-      ...ref,
-      url: `projects/${projectPublicId}/${dataType}/${ref.docId}`,
-    }
-  }
-
-  /**
-   * @param {Ref[] | undefined} refs
-   * @param {string} dataType
-   * @param {string} projectPublicId
-   * @returns {UrlRef[]}
-   */
-  function expandManyRefs(refs, dataType, projectPublicId) {
-    if (!refs) return []
-    return refs.map((ref) => ({
-      ...ref,
-      url: `projects/${projectPublicId}/${dataType}/${ref.docId}`,
-    }))
-  }
-
-  /**
-   *
-   * @param {GetMapeoDoc<"observation">} obs
-   * @param {*} param1
-   * @returns {Static<observationSchema>}
-   */
-  function setAttachmentURL(obs, { projectPublicId, baseUrl }) {
-    return {
-      ...obs,
-      attachments: obs.attachments
-        .filter((attachment) =>
-          SUPPORTED_ATTACHMENT_TYPES.has(/** @type {any} */ (attachment.type)),
-        )
-        .map((attachment) => ({
-          url: new URL(
-            `projects/${projectPublicId}/attachments/${attachment.driveDiscoveryId}/${attachment.type}/${attachment.name}`,
-            baseUrl,
-          ).href,
-        })),
-      presetRef: expandRef(obs.presetRef, 'preset', projectPublicId),
-    }
-  }
-
-  /**
-   * @template {import('@sinclair/typebox').TSchema} TSchema
-   * @template {"track"|"observation"|"preset"|"field"} TDataType
-   * @param {TDataType} dataType - DataType to pull from
-   * @param {TSchema} responseSchema - Schema for the response data
-   * @param {(doc: GetMapeoDoc<TDataType>, req: MapDocParam) => Static<TSchema>|Promise<TSchema>} mapDoc - Add / remove fields
-   * @param {string} [typeRoute] - Route to mount the getters under. Defaults to the dataType
-   */
-  function addDatatypeGetter(
-    dataType,
-    responseSchema,
-    mapDoc,
-    typeRoute = dataType,
-  ) {
-    fastify.get(
-      `/projects/:projectPublicId/${typeRoute}`,
-      {
-        schema: {
-          params: Type.Object({
-            projectPublicId: BASE32_STRING_32_BYTES,
-          }),
-          response: {
-            200: {
-              type: 'object',
-              properties: {
-                data: {
-                  type: 'array',
-                  items: responseSchema,
-                },
-              },
-            },
-            '4xx': schemas.errorResponse,
-          },
-        },
-        async preHandler(req) {
-          verifyBearerAuth(req)
-          await ensureProjectExists(this, req)
-        },
-      },
-      /**
-       * @this {FastifyInstance}
-       */
-      async function (req) {
-        const { projectPublicId } = req.params
-        const project = await this.comapeo.getProject(projectPublicId)
-
-        const datatype = project[dataType]
-
-        const data = await Promise.all(
-          (await datatype.getMany({ includeDeleted: true })).map((doc) =>
-            mapDoc(/** @type {GetMapeoDoc<TDataType>}*/ (doc), {
-              projectPublicId,
-              project,
-              baseUrl: req.baseUrl,
-            }),
-          ),
-        )
-
-        return { data }
-      },
-    )
-
-    fastify.get(
-      `/projects/:projectPublicId/${typeRoute}/:docId`,
-      {
-        schema: {
-          params: Type.Object({
-            projectPublicId: BASE32_STRING_32_BYTES,
-            docId: BASE32_STRING_32_BYTES,
-          }),
-          response: {
-            200: {
-              type: 'object',
-              properties: {
-                data: responseSchema,
-              },
-            },
-            '4xx': schemas.errorResponse,
-          },
-        },
-        async preHandler(req) {
-          verifyBearerAuth(req)
-          await ensureProjectExists(this, req)
-        },
-      },
-      /**
-       * @this {FastifyInstance}
-       */
-      async function (req) {
-        const { projectPublicId, docId } = req.params
-        const project = await this.comapeo.getProject(projectPublicId)
-
-        const datatype = project[dataType]
-
-        const rawData = await datatype.getByDocId(docId)
-
-        const data = await mapDoc(
-          /** @type {GetMapeoDoc<TDataType>}*/ (rawData),
-          {
-            projectPublicId,
-            project,
-            baseUrl: req.baseUrl,
-          },
-        )
-
-        return { data }
-      },
-    )
-  }
+  addDatatypeGetter('field', fieldSchema, (field) => field)
 
   fastify.get(
     '/projects/:projectPublicId/remoteDetectionAlerts',
@@ -681,6 +520,167 @@ export default async function routes(
       return reply.send(proxiedResponse.body)
     },
   )
+
+  /**
+   * @template {import('@sinclair/typebox').TSchema} TSchema
+   * @template {"track"|"observation"|"preset"|"field"} TDataType
+   * @param {TDataType} dataType - DataType to pull from
+   * @param {TSchema} responseSchema - Schema for the response data
+   * @param {(doc: GetMapeoDoc<TDataType>, req: MapDocParam) => Static<TSchema>|Promise<TSchema>} mapDoc - Add / remove fields
+   * @param {string} [typeRoute] - Route to mount the getters under. Defaults to the dataType
+   */
+  function addDatatypeGetter(
+    dataType,
+    responseSchema,
+    mapDoc,
+    typeRoute = dataType,
+  ) {
+    fastify.get(
+      `/projects/:projectPublicId/${typeRoute}`,
+      {
+        schema: {
+          params: Type.Object({
+            projectPublicId: BASE32_STRING_32_BYTES,
+          }),
+          response: {
+            200: {
+              type: 'object',
+              properties: {
+                data: {
+                  type: 'array',
+                  items: responseSchema,
+                },
+              },
+            },
+            '4xx': schemas.errorResponse,
+          },
+        },
+        async preHandler(req) {
+          verifyBearerAuth(req)
+          await ensureProjectExists(this, req)
+        },
+      },
+      /**
+       * @this {FastifyInstance}
+       */
+      async function (req) {
+        const { projectPublicId } = req.params
+        const project = await this.comapeo.getProject(projectPublicId)
+
+        const datatype = project[dataType]
+
+        const data = await Promise.all(
+          (await datatype.getMany({ includeDeleted: true })).map((doc) =>
+            mapDoc(/** @type {GetMapeoDoc<TDataType>}*/ (doc), {
+              projectPublicId,
+              project,
+              baseUrl: req.baseUrl,
+            }),
+          ),
+        )
+
+        return { data }
+      },
+    )
+
+    fastify.get(
+      `/projects/:projectPublicId/${typeRoute}/:docId`,
+      {
+        schema: {
+          params: Type.Object({
+            projectPublicId: BASE32_STRING_32_BYTES,
+            docId: BASE32_STRING_32_BYTES,
+          }),
+          response: {
+            200: {
+              type: 'object',
+              properties: {
+                data: responseSchema,
+              },
+            },
+            '4xx': schemas.errorResponse,
+          },
+        },
+        async preHandler(req) {
+          verifyBearerAuth(req)
+          await ensureProjectExists(this, req)
+        },
+      },
+      /**
+       * @this {FastifyInstance}
+       */
+      async function (req) {
+        const { projectPublicId, docId } = req.params
+        const project = await this.comapeo.getProject(projectPublicId)
+
+        const datatype = project[dataType]
+
+        const rawData = await datatype.getByDocId(docId)
+
+        const data = await mapDoc(
+          /** @type {GetMapeoDoc<TDataType>}*/ (rawData),
+          {
+            projectPublicId,
+            project,
+            baseUrl: req.baseUrl,
+          },
+        )
+
+        return { data }
+      },
+    )
+  }
+}
+
+/**
+ * @param {Ref | undefined} ref
+ * @param {string} dataType
+ * @param {string} projectPublicId
+ * @returns {UrlRef | undefined}
+ */
+function expandRef(ref, dataType, projectPublicId) {
+  if (!ref) return ref
+  return {
+    ...ref,
+    url: `projects/${projectPublicId}/${dataType}/${ref.docId}`,
+  }
+}
+
+/**
+ * @param {Ref[] | undefined} refs
+ * @param {string} dataType
+ * @param {string} projectPublicId
+ * @returns {UrlRef[]}
+ */
+function expandManyRefs(refs, dataType, projectPublicId) {
+  if (!refs) return []
+  return refs.map((ref) => ({
+    ...ref,
+    url: `projects/${projectPublicId}/${dataType}/${ref.docId}`,
+  }))
+}
+
+/**
+ *
+ * @param {GetMapeoDoc<"observation">} obs
+ * @param {*} param1
+ * @returns {Static<observationSchema>}
+ */
+function setAttachmentURL(obs, { projectPublicId, baseUrl }) {
+  return {
+    ...obs,
+    attachments: obs.attachments
+      .filter((attachment) =>
+        SUPPORTED_ATTACHMENT_TYPES.has(/** @type {any} */ (attachment.type)),
+      )
+      .map((attachment) => ({
+        url: new URL(
+          `projects/${projectPublicId}/attachments/${attachment.driveDiscoveryId}/${attachment.type}/${attachment.name}`,
+          baseUrl,
+        ).href,
+      })),
+    presetRef: expandRef(obs.presetRef, 'preset', projectPublicId),
+  }
 }
 
 /**
