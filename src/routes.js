@@ -304,7 +304,7 @@ export default async function routes(
 
   /**
    * @template {import('@sinclair/typebox').TSchema} TSchema
-   * @template {"track"|"observation"|"preset"} [TDataType]
+   * @template {"track"|"observation"|"preset"} TDataType
    * @param {TDataType} dataType - DataType to pull from
    * @param {TSchema} responseSchema - Schema for the response data
    * @param {(doc: GetMapeoDoc<TDataType>, req: {baseUrl: URL, projectPublicId: string}) => import('@sinclair/typebox').Static<TSchema>} mapDoc - Add / remove fields
@@ -341,13 +341,15 @@ export default async function routes(
       async function (req) {
         const { projectPublicId } = req.params
         const project = await this.comapeo.getProject(projectPublicId)
-        const data = (
-          await project[dataType].getMany({ includeDeleted: true })
-        ).map((doc) =>
-          mapDoc(doc, {
-            projectPublicId: req.params.projectPublicId,
-            baseUrl: req.baseUrl,
-          }),
+
+        const datatype = project[dataType]
+
+        const data = (await datatype.getMany({ includeDeleted: true })).map(
+          (doc) =>
+            mapDoc(/** @type {GetMapeoDoc<TDataType>}*/ (doc), {
+              projectPublicId: req.params.projectPublicId,
+              baseUrl: req.baseUrl,
+            }),
         )
 
         return { data }
