@@ -186,3 +186,23 @@ export async function generatePreset(project) {
 
   return presets
 }
+
+/**
+ * Generate a new observation
+ * @returns {import('@comapeo/schema').ObservationValue}
+ */
+export function generateObservation() {
+  const observationDoc = generate('observation', { count: 1 })[0]
+  assert(observationDoc)
+  return valueOf(observationDoc)
+}
+
+/**
+ * Generate a new track
+ * @returns {import('@comapeo/schema').TrackValue}
+ */
+export function generateTrack() {
+  const trackDoc = generate('track', { count: 1 })[0]
+  assert(trackDoc)
+  return valueOf(trackDoc)
+}

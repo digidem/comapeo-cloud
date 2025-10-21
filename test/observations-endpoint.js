@@ -1,7 +1,5 @@
 import { MapeoManager } from '@comapeo/core'
-import { valueOf } from '@comapeo/schema'
 import { keyToPublicId as projectKeyToPublicId } from '@mapeo/crypto'
-import { generate } from '@mapeo/mock-data'
 import { map } from 'iterpal'
 
 import assert from 'node:assert/strict'
@@ -11,6 +9,7 @@ import test from 'node:test'
 import {
   BEARER_TOKEN,
   createTestServer,
+  generateObservation,
   getManagerOptions,
   randomAddProjectBody,
   randomProjectPublicId,
@@ -170,12 +169,6 @@ test('returning observations with fetchable attachments', async (t) => {
     }),
   )
 })
-
-function generateObservation() {
-  const observationDoc = generate('observation')[0]
-  assert(observationDoc)
-  return valueOf(observationDoc)
-}
 
 /**
  * @param {object} blob
