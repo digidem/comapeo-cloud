@@ -140,7 +140,19 @@ test('returning tracks with fetchable observations', async (t) => {
     assert(observationRefs, 'track has observationRefs')
     assert(observationRefs[0]?.url, 'refs have url')
 
-    // TODO: Fetch the observation at the URL
+    const observationResponse = await server.inject({
+      method: 'GET',
+      url: new URL(observationRefs[0].url).pathname,
+      headers: { Authorization: 'Bearer ' + BEARER_TOKEN },
+    })
+    assert.equal(
+      observationResponse.statusCode,
+      200,
+      'able to fetch observation from ref URL',
+    )
+
+    const { data: fetchedObservation } = await observationResponse.json()
+    assert.equal(fetchedObservation.schemaName, 'observation')
   }
 })
 

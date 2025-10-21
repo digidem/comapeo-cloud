@@ -43,7 +43,9 @@ export function getManagerOptions() {
     clientMigrationsFolder,
     dbFolder: ':memory:',
     coreStorage: () => new RAM(),
-    fastify: createFastify(),
+    fastify: createFastify({
+      maxParamLength: 256,
+    }),
   }
 }
 
@@ -55,7 +57,9 @@ export function getManagerOptions() {
 export function createTestServer(t, serverOptions) {
   const managerOptions = getManagerOptions()
   const km = new KeyManager(managerOptions.rootKey)
-  const server = createFastify()
+  const server = createFastify({
+    maxParamLength: 256,
+  })
   server.register(comapeoServer, {
     ...managerOptions,
     ...TEST_SERVER_DEFAULTS,

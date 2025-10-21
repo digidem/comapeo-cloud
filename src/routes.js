@@ -13,6 +13,7 @@ import { Preset as presetSchema } from './datatypes/preset.js'
 import { Track as trackSchema } from './datatypes/track.js'
 import * as errors from './errors.js'
 import * as schemas from './schemas.js'
+import { HEX_STRING_32_BYTES } from './schemas.js'
 import { wsCoreReplicator } from './ws-core-replicator.js'
 
 /** @import { FastifyInstance, FastifyPluginAsync, FastifyRequest, RawServerDefault } from 'fastify' */
@@ -299,19 +300,19 @@ export default async function routes(
     setAttachmentURL,
     'observations',
   )
-  addDatatypeGetter('track', trackSchema, (track, { projectPublicId }) => ({
+  addDatatypeGetter('track', trackSchema, (track, params) => ({
     ...track,
-    presetRef: expandRef(track.presetRef, 'preset', projectPublicId),
+    presetRef: expandRef(track.presetRef, 'preset', params),
     observationRefs: expandManyRefs(
       track.observationRefs,
       'observation',
-      projectPublicId,
+      params,
     ),
   }))
-  addDatatypeGetter('preset', presetSchema, (preset, { projectPublicId }) => ({
+  addDatatypeGetter('preset', presetSchema, (preset, params) => ({
     ...preset,
-    fieldRefs: expandManyRefs(preset.fieldRefs, 'field', projectPublicId),
-    iconRef: expandRef(preset.iconRef, 'icon', projectPublicId),
+    fieldRefs: expandManyRefs(preset.fieldRefs, 'field', params),
+    iconRef: expandRef(preset.iconRef, 'icon', params),
   }))
   addDatatypeGetter('field', fieldSchema, (field) => field)
 
@@ -399,7 +400,7 @@ export default async function routes(
       schema: {
         params: Type.Object({
           projectPublicId: BASE32_STRING_32_BYTES,
-          docId: BASE32_STRING_32_BYTES,
+          docId: schemas.HEX_STRING_32_BYTES,
         }),
         querystring: Type.Object({
           variant: Type.Optional(
@@ -589,7 +590,7 @@ export default async function routes(
         schema: {
           params: Type.Object({
             projectPublicId: BASE32_STRING_32_BYTES,
-            docId: BASE32_STRING_32_BYTES,
+            docId: HEX_STRING_32_BYTES,
           }),
           response: {
             200: {
@@ -635,38 +636,44 @@ export default async function routes(
 /**
  * @param {Ref | undefined} ref
  * @param {string} dataType
- * @param {string} projectPublicId
+ * @param {MapDocParam} opts
  * @returns {UrlRef | undefined}
  */
-function expandRef(ref, dataType, projectPublicId) {
+function expandRef(ref, dataType, { projectPublicId, baseUrl }) {
   if (!ref) return ref
   return {
     ...ref,
-    url: `projects/${projectPublicId}/${dataType}/${ref.docId}`,
+    url: new URL(
+      `projects/${projectPublicId}/${dataType}/${ref.docId}`,
+      baseUrl,
+    ).href,
   }
 }
 
 /**
  * @param {Ref[] | undefined} refs
  * @param {string} dataType
- * @param {string} projectPublicId
+ * @param {MapDocParam} opts
  * @returns {UrlRef[]}
  */
-function expandManyRefs(refs, dataType, projectPublicId) {
+function expandManyRefs(refs, dataType, { projectPublicId, baseUrl }) {
   if (!refs) return []
   return refs.map((ref) => ({
     ...ref,
-    url: `projects/${projectPublicId}/${dataType}/${ref.docId}`,
+    url: new URL(
+      `projects/${projectPublicId}/${dataType}/${ref.docId}`,
+      baseUrl,
+    ).href,
   }))
 }
 
 /**
  *
  * @param {GetMapeoDoc<"observation">} obs
- * @param {*} param1
+ * @param {MapDocParam} params
  * @returns {Static<observationSchema>}
  */
-function setAttachmentURL(obs, { projectPublicId, baseUrl }) {
+function setAttachmentURL(obs, params) {
   return {
     ...obs,
     attachments: obs.attachments
@@ -675,11 +682,11 @@ function setAttachmentURL(obs, { projectPublicId, baseUrl }) {
       )
       .map((attachment) => ({
         url: new URL(
-          `projects/${projectPublicId}/attachments/${attachment.driveDiscoveryId}/${attachment.type}/${attachment.name}`,
-          baseUrl,
+          `projects/${params.projectPublicId}/attachments/${attachment.driveDiscoveryId}/${attachment.type}/${attachment.name}`,
+          params.baseUrl,
         ).href,
       })),
-    presetRef: expandRef(obs.presetRef, 'preset', projectPublicId),
+    presetRef: expandRef(obs.presetRef, 'preset', params),
   }
 }
 
