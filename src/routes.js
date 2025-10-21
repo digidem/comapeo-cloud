@@ -403,7 +403,7 @@ export default async function routes(
           docId: schemas.HEX_STRING_32_BYTES,
         }),
         querystring: Type.Object({
-          variant: Type.Optional(
+          size: Type.Optional(
             Type.Union([
               Type.Literal('small'),
               Type.Literal('medium'),
@@ -426,14 +426,26 @@ export default async function routes(
      */
     async function (req, reply) {
       const { projectPublicId, docId } = req.params
-      const variant = req.query.variant ?? 'medium'
+      const { size = 'medium' } = req.query
       const project = await this.comapeo.getProject(projectPublicId)
+
       const iconUrl = await project.$icons.getIconUrl(docId, {
         mimeType: 'image/svg+xml',
-        size: variant,
+        size,
       })
 
-      const proxiedResponse = await fetch(iconUrl)
+      let proxiedResponse = await fetch(iconUrl)
+
+      // Fall back to png
+      if (proxiedResponse.status === 404) {
+        const iconUrl = await project.$icons.getIconUrl(docId, {
+          mimeType: 'image/png',
+          pixelDensity: 1,
+          size,
+        })
+
+        proxiedResponse = await fetch(iconUrl)
+      }
       reply.code(proxiedResponse.status)
       for (const [headerName, headerValue] of proxiedResponse.headers) {
         reply.header(headerName, headerValue)
