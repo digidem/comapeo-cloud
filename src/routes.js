@@ -433,8 +433,11 @@ export default async function routes(
           pixelDensity: 1,
           size,
         })
-
         proxiedResponse = await fetch(iconUrl)
+      }
+      // We should keep our errors consistant
+      if (proxiedResponse.status !== 200) {
+        throw errors.iconNotFoundErrror()
       }
       reply.code(proxiedResponse.status)
       for (const [headerName, headerValue] of proxiedResponse.headers) {
