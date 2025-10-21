@@ -50,6 +50,8 @@ await mkdir(dataTypesDir, {
   recursive: true,
 })
 
+// schema2typebox delcars var witu `var` instead of const
+// This interferes with our lint rules so we convert it to const
 const matchVar = / var /gu
 
 await Promise.all(
@@ -63,6 +65,7 @@ await Promise.all(
     const source = await schema2typebox({ input: file })
 
     console.log(name, 'compiling')
+    // They output TS so we want to translate it directly to JS
     const { outputText: compiled } = ts.transpileModule(source, {
       compilerOptions: {
         module: ts.ModuleKind.ES2022,
@@ -96,9 +99,13 @@ function extendProperties(schema, properties) {
 }
 
 /**
+ * @typedef {{ properties: Record<string, unknown>, required?: Readonly<string[]> }} SchemaWithProperties
+ */
+
+/**
  * Adds a URL field to a JSON schema object
  * @template {object} T
- * @param {T & { properties: Record<string, unknown>, required?: Readonly<string[]> }} schema - The JSON schema object to extend
+ * @param {T & SchemaWithProperties} schema - The JSON schema object to extend
  * @returns {T & { properties: { url: { type: 'string' } } }} The schema with an added url property
  */
 function addUrlField(schema) {
@@ -117,7 +124,7 @@ function addUrlField(schema) {
 /**
  * Adds a URL field to the properties of each item in the array within a JSON schema object.
  * @template {object} T
- * @param {T & { items: { properties: Record<string, unknown> } }} arraySchema - The JSON schema object with an array as its items to extend
+ * @param {T & { items: SchemaWithProperties }} arraySchema - The JSON schema object with an array as its items to extend
  * @returns {T & { items: { properties: { url: { type: 'string' } } } }} The schema with a URL field added to each item's properties
  */
 function addUrlFieldArray(arraySchema) {

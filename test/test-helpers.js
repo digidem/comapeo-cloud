@@ -45,9 +45,7 @@ export function getManagerOptions() {
     clientMigrationsFolder,
     dbFolder: ':memory:',
     coreStorage: () => new RAM(),
-    fastify: createFastify({
-      maxParamLength: 256,
-    }),
+    fastify: createFastify(),
   }
 }
 

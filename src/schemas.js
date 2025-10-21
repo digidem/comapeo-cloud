@@ -7,13 +7,6 @@ const dateTimeString = Type.String({ format: 'date-time' })
 const latitude = Type.Number({ minimum: -90, maximum: 90 })
 const longitude = Type.Number({ minimum: -180, maximum: 180 })
 
-const commonDataTypeProps = {
-  docId: Type.String(),
-  createdAt: dateTimeString,
-  updatedAt: dateTimeString,
-  deleted: Type.Boolean(),
-}
-
 export const errorResponse = Type.Object({
   error: Type.Object({
     code: Type.String(),
@@ -86,6 +79,9 @@ export const remoteDetectionAlertToAdd = Type.Object({
 })
 
 export const remoteDetectionAlertResult = Type.Object({
-  ...commonDataTypeProps,
+  docId: Type.String(),
+  createdAt: dateTimeString,
+  updatedAt: dateTimeString,
+  deleted: Type.Boolean(),
   ...remoteDetectionAlertCommon,
 })

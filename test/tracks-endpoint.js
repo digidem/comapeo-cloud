@@ -15,8 +15,6 @@ import {
   runWithRetries,
 } from './test-helpers.js'
 
-/** @import { ObservationValue } from '@comapeo/schema'*/
-/** @import { FastifyInstance } from 'fastify' */
 /** @import {Static} from '@sinclair/typebox' */
 /** @import {Track} from '../src/datatypes/track.js' */
 
@@ -109,7 +107,7 @@ test('returning tracks with fetchable observations', async (t) => {
 
   // It's possible that the client thinks it's synced but the server hasn't
   // processed everything yet, so we try a few times.
-  const gotTracks = /** @type {import('@sinclair/typebox').Static<Track>[]}*/ (
+  const gotTracks = /** @type {Static<Track>[]}*/ (
     await runWithRetries(3, async () => {
       const response = await server.inject({
         authority: serverUrl.host,
@@ -131,7 +129,7 @@ test('returning tracks with fetchable observations', async (t) => {
     const { observationRefs, ...generalData } = found
     const {
       observationRefs: _,
-      // TODO: Why are these fields being set at all?
+      // Remove irrelevant fields
       presetRef: _2,
       forks: _3,
       ...expectedData

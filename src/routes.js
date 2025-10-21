@@ -21,23 +21,13 @@ import { wsCoreReplicator } from './ws-core-replicator.js'
 /** @import { MapeoDoc } from '@comapeo/schema' */
 /** @import { MapeoProject } from '@comapeo/core/dist/mapeo-project.js' */
 /** @import {Static, TSchema} from '@sinclair/typebox' */
-
 /**
  * @template {MapeoDoc['schemaName']} TSchemaName
  * @typedef {Extract<MapeoDoc, { schemaName: TSchemaName }>} GetMapeoDoc
  */
-
-/**
- * @typedef {{baseUrl: URL, projectPublicId: string, project: MapeoProject}} MapDocParam
- */
-
-/**
- * @typedef {{docId: string, versionId: string}} Ref
- */
-
-/**
- * @typedef {{docId: string, versionId: string, url: string}} UrlRef
- */
+/** @typedef {{baseUrl: URL, projectPublicId: string, project: MapeoProject}} MapDocParam */
+/** @typedef {{docId: string, versionId: string}} Ref*/
+/** @typedef {{docId: string, versionId: string, url: string}} UrlRef */
 
 const BEARER_SPACE_LENGTH = 'Bearer '.length
 
@@ -535,11 +525,11 @@ export default async function routes(
   )
 
   /**
-   * @template {import('@sinclair/typebox').TSchema} TSchema
+   * @template {TSchema} Schema
    * @template {"track"|"observation"|"preset"|"field"} TDataType
    * @param {TDataType} dataType - DataType to pull from
-   * @param {TSchema} responseSchema - Schema for the response data
-   * @param {(doc: GetMapeoDoc<TDataType>, req: MapDocParam) => Static<TSchema>|Promise<TSchema>} mapDoc - Add / remove fields
+   * @param {Schema} responseSchema - Schema for the response data
+   * @param {(doc: GetMapeoDoc<TDataType>, req: MapDocParam) => Static<Schema>|Promise<Static<Schema>>} mapDoc - Add / remove fields
    * @param {string} [typeRoute] - Route to mount the getters under. Defaults to the dataType
    */
   function addDatatypeGetter(

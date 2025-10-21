@@ -14,8 +14,6 @@ import {
   runWithRetries,
 } from './test-helpers.js'
 
-/** @import { ObservationValue } from '@comapeo/schema'*/
-/** @import { FastifyInstance } from 'fastify' */
 /** @import {Static} from '@sinclair/typebox' */
 /** @import {Preset} from '../src/datatypes/preset.js' */
 
@@ -88,22 +86,21 @@ test('returning presets with fetchable fields and icons', async (t) => {
 
   // It's possible that the client thinks it's synced but the server hasn't
   // processed everything yet, so we try a few times.
-  const gotPresets =
-    /** @type {import('@sinclair/typebox').Static<Preset>[]}*/ (
-      await runWithRetries(3, async () => {
-        const response = await server.inject({
-          authority: serverUrl.host,
-          method: 'GET',
-          url: `/projects/${projectId}/preset`,
-          headers: { Authorization: 'Bearer ' + BEARER_TOKEN },
-        })
-        assert.equal(response.statusCode, 200)
-
-        const { data } = await response.json()
-        assert.equal(data.length, presets.length)
-        return data
+  const gotPresets = /** @type {Static<Preset>[]}*/ (
+    await runWithRetries(3, async () => {
+      const response = await server.inject({
+        authority: serverUrl.host,
+        method: 'GET',
+        url: `/projects/${projectId}/preset`,
+        headers: { Authorization: 'Bearer ' + BEARER_TOKEN },
       })
-    )
+      assert.equal(response.statusCode, 200)
+
+      const { data } = await response.json()
+      assert.equal(data.length, presets.length)
+      return data
+    })
+  )
 
   for (const preset of presets) {
     const found = gotPresets.find(({ docId }) => docId === preset.docId)
