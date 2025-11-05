@@ -26,32 +26,6 @@ export const projectToAdd = Type.Object({
   }),
 })
 
-export const observationResult = Type.Object({
-  docId: Type.String(),
-  createdAt: dateTimeString,
-  updatedAt: dateTimeString,
-  deleted: Type.Boolean(),
-  lat: Type.Optional(latitude),
-  lon: Type.Optional(longitude),
-  attachments: Type.Array(
-    Type.Object({
-      url: Type.String(),
-    }),
-  ),
-  tags: Type.Record(
-    Type.String(),
-    Type.Union([
-      Type.Boolean(),
-      Type.Number(),
-      Type.String(),
-      Type.Null(),
-      Type.Array(
-        Type.Union([Type.Boolean(), Type.Number(), Type.String(), Type.Null()]),
-      ),
-    ]),
-  ),
-})
-
 const position = Type.Tuple([longitude, latitude])
 
 const remoteDetectionAlertCommon = {

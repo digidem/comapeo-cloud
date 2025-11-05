@@ -10,6 +10,7 @@ import RAM from 'random-access-memory'
 import assert from 'node:assert/strict'
 import { randomBytes } from 'node:crypto'
 import { setTimeout as delay } from 'node:timers/promises'
+import { fileURLToPath } from 'node:url'
 
 import comapeoServer from '../src/app.js'
 
@@ -17,6 +18,7 @@ import comapeoServer from '../src/app.js'
 /** @import { TestContext } from 'node:test' */
 /** @import { FastifyInstance } from 'fastify' */
 /** @import { ServerOptions } from '../src/app.js' */
+/** @import { MapeoProject } from '@comapeo/core/dist/mapeo-project.js' */
 
 export const BEARER_TOKEN = Buffer.from('swordfish').toString('base64')
 
@@ -55,7 +57,9 @@ export function getManagerOptions() {
 export function createTestServer(t, serverOptions) {
   const managerOptions = getManagerOptions()
   const km = new KeyManager(managerOptions.rootKey)
-  const server = createFastify()
+  const server = createFastify({
+    maxParamLength: 256,
+  })
   server.register(comapeoServer, {
     ...managerOptions,
     ...TEST_SERVER_DEFAULTS,
@@ -162,4 +166,43 @@ export function generateAlerts(
     generate('remoteDetectionAlert', { count: count - alerts.length }),
   )
   return alerts.map((alert) => valueOf(alert))
+}
+
+/**
+ * Import preset from config and return one of them that could be used for tests
+ * @param {MapeoProject} project
+ * @returns {Promise<ReturnType<MapeoProject["preset"]["getMany"]>>}
+ */
+export async function generatePreset(project) {
+  await project.importConfig({
+    configPath: fileURLToPath(
+      import.meta.resolve('./fixtures/validConfig.zip'),
+    ),
+  })
+
+  const presets = await project.preset.getMany()
+
+  assert(presets.length, 'presets got created')
+
+  return presets
+}
+
+/**
+ * Generate a new observation
+ * @returns {import('@comapeo/schema').ObservationValue}
+ */
+export function generateObservation() {
+  const observationDoc = generate('observation', { count: 1 })[0]
+  assert(observationDoc)
+  return valueOf(observationDoc)
+}
+
+/**
+ * Generate a new track
+ * @returns {import('@comapeo/schema').TrackValue}
+ */
+export function generateTrack() {
+  const trackDoc = generate('track', { count: 1 })[0]
+  assert(trackDoc)
+  return valueOf(trackDoc)
 }

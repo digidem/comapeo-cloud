@@ -79,6 +79,7 @@ if (!rootKey || rootKey.length !== 16) {
 const fastify = createFastify({
   logger: true,
   trustProxy: true,
+  maxParamLength: 256,
 })
 fastify.register(comapeoServer, {
   serverName: config.SERVER_NAME,

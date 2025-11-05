@@ -7,12 +7,27 @@ import assert from 'node:assert/strict'
 import * as fs from 'node:fs'
 import { STATUS_CODES } from 'node:http'
 
+import { Field as fieldSchema } from './datatypes/field.js'
+import { Observation as observationSchema } from './datatypes/observation.js'
+import { Preset as presetSchema } from './datatypes/preset.js'
+import { Track as trackSchema } from './datatypes/track.js'
 import * as errors from './errors.js'
 import * as schemas from './schemas.js'
+import { HEX_STRING_32_BYTES } from './schemas.js'
 import { wsCoreReplicator } from './ws-core-replicator.js'
 
 /** @import { FastifyInstance, FastifyPluginAsync, FastifyRequest, RawServerDefault } from 'fastify' */
 /** @import { TypeBoxTypeProvider } from '@fastify/type-provider-typebox' */
+/** @import { MapeoDoc } from '@comapeo/schema' */
+/** @import { MapeoProject } from '@comapeo/core/dist/mapeo-project.js' */
+/** @import {Static, TSchema} from '@sinclair/typebox' */
+/**
+ * @template {MapeoDoc['schemaName']} TSchemaName
+ * @typedef {Extract<MapeoDoc, { schemaName: TSchemaName }>} GetMapeoDoc
+ */
+/** @typedef {{baseUrl: URL, projectPublicId: string, project: MapeoProject}} MapDocParam */
+/** @typedef {{docId: string, versionId: string}} Ref*/
+/** @typedef {{docId: string, versionId: string, url: string}} UrlRef */
 
 const BEARER_SPACE_LENGTH = 'Bearer '.length
 
@@ -267,59 +282,29 @@ export default async function routes(
     },
   )
 
-  fastify.get(
-    '/projects/:projectPublicId/observations',
-    {
-      schema: {
-        params: Type.Object({
-          projectPublicId: BASE32_STRING_32_BYTES,
-        }),
-        response: {
-          200: Type.Object({
-            data: Type.Array(schemas.observationResult),
-          }),
-          '4xx': schemas.errorResponse,
-        },
-      },
-      async preHandler(req) {
-        verifyBearerAuth(req)
-        await ensureProjectExists(this, req)
-      },
-    },
-    /**
-     * @this {FastifyInstance}
-     */
-    async function (req) {
-      const { projectPublicId } = req.params
-      const project = await this.comapeo.getProject(projectPublicId)
-
-      return {
-        data: (await project.observation.getMany({ includeDeleted: true })).map(
-          (obs) => ({
-            docId: obs.docId,
-            createdAt: obs.createdAt,
-            updatedAt: obs.updatedAt,
-            deleted: obs.deleted,
-            lat: obs.lat,
-            lon: obs.lon,
-            attachments: obs.attachments
-              .filter((attachment) =>
-                SUPPORTED_ATTACHMENT_TYPES.has(
-                  /** @type {any} */ (attachment.type),
-                ),
-              )
-              .map((attachment) => ({
-                url: new URL(
-                  `projects/${projectPublicId}/attachments/${attachment.driveDiscoveryId}/${attachment.type}/${attachment.name}`,
-                  req.baseUrl,
-                ).href,
-              })),
-            tags: obs.tags,
-          }),
-        ),
-      }
-    },
+  addDatatypeGetter('observation', observationSchema, setAttachmentURL)
+  // TODO: backwards compat, remove this in next major release
+  addDatatypeGetter(
+    'observation',
+    observationSchema,
+    setAttachmentURL,
+    'observations',
   )
+  addDatatypeGetter('track', trackSchema, (track, params) => ({
+    ...track,
+    presetRef: expandRef(track.presetRef, 'preset', params),
+    observationRefs: expandManyRefs(
+      track.observationRefs,
+      'observation',
+      params,
+    ),
+  }))
+  addDatatypeGetter('preset', presetSchema, (preset, params) => ({
+    ...preset,
+    fieldRefs: expandManyRefs(preset.fieldRefs, 'field', params),
+    iconRef: expandRef(preset.iconRef, 'icon', params),
+  }))
+  addDatatypeGetter('field', fieldSchema, (field) => field)
 
   fastify.get(
     '/projects/:projectPublicId/remoteDetectionAlerts',
@@ -396,6 +381,69 @@ export default async function routes(
       })
 
       reply.status(201).send()
+    },
+  )
+
+  fastify.get(
+    `/projects/:projectPublicId/icon/:docId`,
+    {
+      schema: {
+        params: Type.Object({
+          projectPublicId: BASE32_STRING_32_BYTES,
+          docId: schemas.HEX_STRING_32_BYTES,
+        }),
+        querystring: Type.Object({
+          size: Type.Optional(
+            Type.Union([
+              Type.Literal('small'),
+              Type.Literal('medium'),
+              Type.Literal('large'),
+            ]),
+          ),
+        }),
+        response: {
+          200: {},
+          '4xx': schemas.errorResponse,
+        },
+      },
+      async preHandler(req) {
+        verifyBearerAuth(req)
+        await ensureProjectExists(this, req)
+      },
+    },
+    /**
+     * @this {FastifyInstance}
+     */
+    async function (req, reply) {
+      const { projectPublicId, docId } = req.params
+      const { size = 'medium' } = req.query
+      const project = await this.comapeo.getProject(projectPublicId)
+
+      const iconUrl = await project.$icons.getIconUrl(docId, {
+        mimeType: 'image/svg+xml',
+        size,
+      })
+
+      let proxiedResponse = await fetch(iconUrl)
+
+      // Fall back to png
+      if (proxiedResponse.status === 404) {
+        const iconUrl = await project.$icons.getIconUrl(docId, {
+          mimeType: 'image/png',
+          pixelDensity: 1,
+          size,
+        })
+        proxiedResponse = await fetch(iconUrl)
+      }
+      // We should keep our errors consistant
+      if (proxiedResponse.status !== 200) {
+        throw errors.iconNotFoundErrror()
+      }
+      reply.code(proxiedResponse.status)
+      for (const [headerName, headerValue] of proxiedResponse.headers) {
+        reply.header(headerName, headerValue)
+      }
+      return reply.send(proxiedResponse.body)
     },
   )
 
@@ -478,6 +526,173 @@ export default async function routes(
       return reply.send(proxiedResponse.body)
     },
   )
+
+  /**
+   * @template {TSchema} Schema
+   * @template {"track"|"observation"|"preset"|"field"} TDataType
+   * @param {TDataType} dataType - DataType to pull from
+   * @param {Schema} responseSchema - Schema for the response data
+   * @param {(doc: GetMapeoDoc<TDataType>, req: MapDocParam) => Static<Schema>|Promise<Static<Schema>>} mapDoc - Add / remove fields
+   * @param {string} [typeRoute] - Route to mount the getters under. Defaults to the dataType
+   */
+  function addDatatypeGetter(
+    dataType,
+    responseSchema,
+    mapDoc,
+    typeRoute = dataType,
+  ) {
+    fastify.get(
+      `/projects/:projectPublicId/${typeRoute}`,
+      {
+        schema: {
+          params: Type.Object({
+            projectPublicId: BASE32_STRING_32_BYTES,
+          }),
+          response: {
+            200: {
+              type: 'object',
+              properties: {
+                data: {
+                  type: 'array',
+                  items: responseSchema,
+                },
+              },
+            },
+            '4xx': schemas.errorResponse,
+          },
+        },
+        async preHandler(req) {
+          verifyBearerAuth(req)
+          await ensureProjectExists(this, req)
+        },
+      },
+      /**
+       * @this {FastifyInstance}
+       */
+      async function (req) {
+        const { projectPublicId } = req.params
+        const project = await this.comapeo.getProject(projectPublicId)
+
+        const datatype = project[dataType]
+
+        const data = await Promise.all(
+          (await datatype.getMany({ includeDeleted: true })).map((doc) =>
+            mapDoc(/** @type {GetMapeoDoc<TDataType>}*/ (doc), {
+              projectPublicId,
+              project,
+              baseUrl: req.baseUrl,
+            }),
+          ),
+        )
+
+        return { data }
+      },
+    )
+
+    fastify.get(
+      `/projects/:projectPublicId/${typeRoute}/:docId`,
+      {
+        schema: {
+          params: Type.Object({
+            projectPublicId: BASE32_STRING_32_BYTES,
+            docId: HEX_STRING_32_BYTES,
+          }),
+          response: {
+            200: {
+              type: 'object',
+              properties: {
+                data: responseSchema,
+              },
+            },
+            '4xx': schemas.errorResponse,
+          },
+        },
+        async preHandler(req) {
+          verifyBearerAuth(req)
+          await ensureProjectExists(this, req)
+        },
+      },
+      /**
+       * @this {FastifyInstance}
+       */
+      async function (req) {
+        const { projectPublicId, docId } = req.params
+        const project = await this.comapeo.getProject(projectPublicId)
+
+        const datatype = project[dataType]
+
+        const rawData = await datatype.getByDocId(docId)
+
+        const data = await mapDoc(
+          /** @type {GetMapeoDoc<TDataType>}*/ (rawData),
+          {
+            projectPublicId,
+            project,
+            baseUrl: req.baseUrl,
+          },
+        )
+
+        return { data }
+      },
+    )
+  }
+}
+
+/**
+ * @param {Ref | undefined} ref
+ * @param {string} dataType
+ * @param {MapDocParam} opts
+ * @returns {UrlRef | undefined}
+ */
+function expandRef(ref, dataType, { projectPublicId, baseUrl }) {
+  if (!ref) return ref
+  return {
+    ...ref,
+    url: new URL(
+      `projects/${projectPublicId}/${dataType}/${ref.docId}`,
+      baseUrl,
+    ).href,
+  }
+}
+
+/**
+ * @param {Ref[] | undefined} refs
+ * @param {string} dataType
+ * @param {MapDocParam} opts
+ * @returns {UrlRef[]}
+ */
+function expandManyRefs(refs, dataType, { projectPublicId, baseUrl }) {
+  if (!refs) return []
+  return refs.map((ref) => ({
+    ...ref,
+    url: new URL(
+      `projects/${projectPublicId}/${dataType}/${ref.docId}`,
+      baseUrl,
+    ).href,
+  }))
+}
+
+/**
+ *
+ * @param {GetMapeoDoc<"observation">} obs
+ * @param {MapDocParam} params
+ * @returns {Static<observationSchema>}
+ */
+function setAttachmentURL(obs, params) {
+  return {
+    ...obs,
+    attachments: obs.attachments
+      .filter((attachment) =>
+        SUPPORTED_ATTACHMENT_TYPES.has(/** @type {any} */ (attachment.type)),
+      )
+      .map((attachment) => ({
+        url: new URL(
+          `projects/${params.projectPublicId}/attachments/${attachment.driveDiscoveryId}/${attachment.type}/${attachment.name}`,
+          params.baseUrl,
+        ).href,
+      })),
+    presetRef: expandRef(obs.presetRef, 'preset', params),
+  }
 }
 
 /**
