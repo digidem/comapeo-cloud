@@ -218,6 +218,8 @@ export const Observation = Type.Object(
         },
       ),
     ),
+    createdBy: Type.Optional(Type.String()),
+    updatedBy: Type.Optional(Type.String()),
   },
   {
     $schema: 'http://json-schema.org/draft-07/schema#',

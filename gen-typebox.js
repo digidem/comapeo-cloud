@@ -10,7 +10,19 @@ const TO_GEN = ['observation', 'track', 'preset', 'field']
 // We extend the schema instead of assigning values to a clone
 // because JSDoc has no clean way to mark nested trees as mutable
 
+// These are not part of the scheme but are added by the DataType class
+// to show who authored a particular change
+const authorFields = {
+  createdBy: {
+    type: 'string',
+  },
+  updatedBy: {
+    type: 'string',
+  },
+}
+
 const observationSchema = extendProperties(originals.observation, {
+  ...authorFields,
   attachments: {
     type: 'array',
     items: {
@@ -28,17 +40,21 @@ const observationSchema = extendProperties(originals.observation, {
 })
 
 const presetSchema = extendProperties(originals.preset, {
+  ...authorFields,
   fieldRefs: addUrlFieldArray(originals.preset.properties.fieldRefs),
   iconRef: addUrlField(originals.preset.properties.iconRef),
 })
 
 const trackSchema = extendProperties(originals.track, {
+  ...authorFields,
   observationRefs: addUrlFieldArray(originals.track.properties.observationRefs),
   presetRef: addUrlField(originals.track.properties.presetRef),
 })
 
+const fieldSchema = extendProperties(originals.field, authorFields)
+
 const schemas = {
-  ...originals,
+  field: fieldSchema,
   observation: observationSchema,
   preset: presetSchema,
   track: trackSchema,
