@@ -174,10 +174,8 @@ export function generateAlerts(
  * @returns {Promise<ReturnType<MapeoProject["preset"]["getMany"]>>}
  */
 export async function generatePreset(project) {
-  await project.importConfig({
-    configPath: fileURLToPath(
-      import.meta.resolve('./fixtures/validConfig.zip'),
-    ),
+  await project.$importCategories({
+    filePath: fileURLToPath(import.meta.resolve('@mapeo/default-config')),
   })
 
   const presets = await project.preset.getMany()

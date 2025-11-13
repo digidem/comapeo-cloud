@@ -64,11 +64,12 @@
     "typescript": "^5.6.3"
   },
   "dependencies": {
-    "@comapeo/core": "^4.1.0",
+    "@comapeo/core": "^5.1.1",
     "@fastify/sensible": "^5.6.0",
     "@fastify/type-provider-typebox": "^4.1.0",
     "@fastify/websocket": "^10.0.1",
     "@mapeo/crypto": "^1.0.0-alpha.10",
+    "@mapeo/default-config": "^6.0.0",
     "@sinclair/typebox": "^0.33.17",
     "ajv": "^8.17.1",
     "env-schema": "^6.0.0",

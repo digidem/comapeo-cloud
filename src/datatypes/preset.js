@@ -157,6 +157,8 @@ export const Preset = Type.Object(
         pattern: '^#[a-fA-F0-9]{6}$',
       }),
     ),
+    createdBy: Type.Optional(Type.String()),
+    updatedBy: Type.Optional(Type.String()),
   },
   {
     $schema: 'http://json-schema.org/draft-07/schema#',

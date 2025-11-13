@@ -86,8 +86,10 @@ test('fetch presetRef in observation', async (t) => {
 
   const presets = await generatePreset(project)
 
+  // Get a preset for the observation without any fields in it
   const observationPreset = presets.filter(
-    ({ geometry }) => geometry.length === 1 && geometry[0] === 'point',
+    ({ geometry, fieldRefs }) =>
+      !fieldRefs?.length && geometry.length === 1 && geometry[0] === 'point',
   )[0]
 
   assert(observationPreset)
@@ -163,8 +165,10 @@ test('fetch presetRef in track', async (t) => {
 
   const presets = await generatePreset(project)
 
+  // Get a preset for the observation without any fields in it
   const trackPreset = presets.filter(
-    ({ geometry }) => geometry.length === 1 && geometry[0] === 'line',
+    ({ geometry, fieldRefs }) =>
+      !fieldRefs?.length && geometry.length === 1 && geometry[0] === 'line',
   )[0]
 
   assert(trackPreset)
@@ -218,7 +222,11 @@ test('fetch presetRef in track', async (t) => {
 
   const { forks: _2, iconRef: _3, ...expectedPreset } = trackPreset
 
-  assert.deepEqual(fetchedPreset, expectedPreset, 'fetched preset matches')
+  assert.deepEqual(
+    fetchedPreset,
+    cleanUndefinedFields(expectedPreset),
+    'fetched preset matches',
+  )
 })
 
 test('returning presets with fetchable fields and icons', async (t) => {
@@ -265,7 +273,11 @@ test('returning presets with fetchable fields and icons', async (t) => {
     assert(found, 'preset got returned')
     const { fieldRefs, iconRef, ...generalData } = found
     const { fieldRefs: _, iconRef: _2, forks: _3, ...expectedData } = preset
-    assert.deepEqual(generalData, expectedData, 'general preset fields match')
+    assert.deepEqual(
+      generalData,
+      cleanUndefinedFields(expectedData),
+      'general preset fields match',
+    )
 
     assert(fieldRefs, 'preset has fieldRefs')
     if (!fieldRefs.length) continue
@@ -298,3 +310,18 @@ test('returning presets with fetchable fields and icons', async (t) => {
     )
   }
 })
+
+/**
+ * @template {Record<string, any>} T
+ * @param {T} value
+ * @returns {T}
+ */
+function cleanUndefinedFields(value) {
+  for (const key of Object.keys(value)) {
+    // eslint-disable-next-line no-undefined
+    if (value[key] === undefined) {
+      delete value[key]
+    }
+  }
+  return value
+}

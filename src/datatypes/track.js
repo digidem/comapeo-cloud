@@ -71,7 +71,7 @@ export const Track = Type.Object(
         },
         { description: 'Position details' },
       ),
-      { description: 'Array of positions along the track' },
+      { description: 'Array of positions along the track', minItems: 2 },
     ),
     observationRefs: Type.Array(
       Type.Object({
@@ -130,6 +130,8 @@ export const Track = Type.Object(
         },
       ),
     ),
+    createdBy: Type.Optional(Type.String()),
+    updatedBy: Type.Optional(Type.String()),
   },
   {
     $schema: 'http://json-schema.org/draft-07/schema#',
