@@ -1,5 +1,5 @@
 import { MapeoManager } from '@comapeo/core'
-import { valueOf } from '@comapeo/schema'
+import { valueOf } from '@comapeo/core/schema.js'
 import { keyToPublicId as projectKeyToPublicId } from '@mapeo/crypto'
 import { generate } from '@mapeo/mock-data'
 
@@ -157,7 +157,7 @@ test('returning tracks with fetchable observations', async (t) => {
 /**
  *
  * @param {{docId: string, versionId: string}[]} observationRefs
- * @returns {import('@comapeo/schema').TrackValue}
+ * @returns {import('@comapeo/core/schema.js').TrackValue}
  */
 function makeTrack(observationRefs) {
   const rawTrack = generate('track', { count: 1 })[0]

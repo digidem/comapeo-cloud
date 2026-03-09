@@ -1,5 +1,5 @@
 import { MapeoManager } from '@comapeo/core'
-import { valueOf } from '@comapeo/schema'
+import { valueOf } from '@comapeo/core/schema.js'
 import { isValidDateTime } from '@garbee/iso8601'
 import { keyToPublicId as projectKeyToPublicId } from '@mapeo/crypto'
 

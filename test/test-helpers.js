@@ -1,4 +1,4 @@
-import { valueOf } from '@comapeo/schema'
+import { valueOf } from '@comapeo/core/schema.js'
 import {
   KeyManager,
   keyToPublicId as projectKeyToPublicId,
@@ -18,7 +18,7 @@ import comapeoServer from '../src/app.js'
 /** @import { TestContext } from 'node:test' */
 /** @import { FastifyInstance } from 'fastify' */
 /** @import { ServerOptions } from '../src/app.js' */
-/** @import { MapeoProject } from '@comapeo/core/dist/mapeo-project.js' */
+/** @import { MapeoProject } from '@comapeo/core' */
 
 export const BEARER_TOKEN = Buffer.from('swordfish').toString('base64')
 
@@ -153,7 +153,7 @@ export function generateAlerts(
   // Hacky, but should get the job done ensuring we have all geometry types in the test
   const alerts = []
   for (const geometryType of geometryTypes) {
-    /** @type {import('@comapeo/schema').RemoteDetectionAlert | undefined} */
+    /** @type {import('@comapeo/core/schema.js').RemoteDetectionAlert | undefined} */
     let alert
     while (!alert || alert.geometry.type !== geometryType) {
       ;[alert] = generate('remoteDetectionAlert', { count: 1 })
@@ -187,7 +187,7 @@ export async function generatePreset(project) {
 
 /**
  * Generate a new observation
- * @returns {import('@comapeo/schema').ObservationValue}
+ * @returns {import('@comapeo/core/schema.js').ObservationValue}
  */
 export function generateObservation() {
   const observationDoc = generate('observation', { count: 1 })[0]
@@ -197,7 +197,7 @@ export function generateObservation() {
 
 /**
  * Generate a new track
- * @returns {import('@comapeo/schema').TrackValue}
+ * @returns {import('@comapeo/core/schema.js').TrackValue}
  */
 export function generateTrack() {
   const trackDoc = generate('track', { count: 1 })[0]

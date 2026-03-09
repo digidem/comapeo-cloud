@@ -1,4 +1,4 @@
-import { dereferencedDocSchemas as originals } from '@comapeo/schema'
+import { dereferencedDocSchemas as originals } from '@comapeo/core/schema.js'
 import { schema2typebox } from 'schema2typebox'
 import * as ts from 'typescript'
 

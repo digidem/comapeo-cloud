@@ -18,8 +18,8 @@ import { wsCoreReplicator } from './ws-core-replicator.js'
 
 /** @import { FastifyInstance, FastifyPluginAsync, FastifyRequest, RawServerDefault } from 'fastify' */
 /** @import { TypeBoxTypeProvider } from '@fastify/type-provider-typebox' */
-/** @import { MapeoDoc } from '@comapeo/schema' */
-/** @import { MapeoProject } from '@comapeo/core/dist/mapeo-project.js' */
+/** @import { MapeoDoc } from '@comapeo/core/schema.js' */
+/** @import { MapeoProject } from '@comapeo/core' */
 /** @import {Static, TSchema} from '@sinclair/typebox' */
 /**
  * @template {MapeoDoc['schemaName']} TSchemaName
