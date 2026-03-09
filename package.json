@@ -43,7 +43,6 @@
   },
   "homepage": "https://github.com/digidem/comapeo-cloud#readme",
   "devDependencies": {
-    "@comapeo/schema": "^2.0.0",
     "@eslint/js": "^9.14.0",
     "@garbee/iso8601": "^1.0.3",
     "@mapeo/mock-data": "^5.0.0",
@@ -64,7 +63,7 @@
     "typescript": "^5.6.3"
   },
   "dependencies": {
-    "@comapeo/core": "^5.1.1",
+    "@comapeo/core": "^6.0.0",
     "@fastify/sensible": "^5.6.0",
     "@fastify/type-provider-typebox": "^4.1.0",
     "@fastify/websocket": "^10.0.1",

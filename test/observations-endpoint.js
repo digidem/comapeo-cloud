@@ -16,7 +16,7 @@ import {
   runWithRetries,
 } from './test-helpers.js'
 
-/** @import { ObservationValue } from '@comapeo/schema'*/
+/** @import { ObservationValue } from '@comapeo/core/schema.js'*/
 /** @import { FastifyInstance } from 'fastify' */
 
 const FIXTURES_ROOT = new URL('./fixtures/', import.meta.url)
