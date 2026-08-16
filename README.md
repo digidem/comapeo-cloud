@@ -22,13 +22,16 @@ Or use the [`Dockerfile`](./Dockerfile) to build a Docker image.
 
 Server configuration is done using environment variables. The following environment variables are available:
 
-| Environment Variable  | Required | Description                                                          | Default Value    |
-| --------------------- | -------- | -------------------------------------------------------------------- | ---------------- |
-| `SERVER_BEARER_TOKEN` | Yes      | Token for authenticating API requests. Should be large random string |                  |
-| `PORT`                | No       | Port on which the server runs                                        | `8080`           |
-| `SERVER_NAME`         | No       | Friendly server name, seen by users when adding server               | `CoMapeo Server` |
-| `ALLOWED_PROJECTS`    | No       | Number of projects allowed to register with the server               | `1`              |
-| `STORAGE_DIR`         | No       | Path for storing app & project data                                  | `$CWD/data`      |
+| Environment Variable          | Required | Description                                                                                          | Default Value    |
+| ----------------------------- | -------- | ---------------------------------------------------------------------------------------------------- | ---------------- |
+| `SERVER_BEARER_TOKEN`         | Yes      | Archive-wide token for authenticating API requests. Should be a large random string                  |                  |
+| `PROJECT_ACCESS_TOKEN_SECRET` | No       | Enables project-scoped REST credentials. Must be exactly 32 random bytes encoded as canonical base64 |                  |
+| `PORT`                        | No       | Port on which the server runs                                                                        | `8080`           |
+| `SERVER_NAME`                 | No       | Friendly server name, seen by users when adding server                                               | `CoMapeo Server` |
+| `ALLOWED_PROJECTS`            | No       | Number of projects allowed to register with the server                                               | `1`              |
+| `STORAGE_DIR`                 | No       | Path for storing app & project data                                                                  | `$CWD/data`      |
+
+`SERVER_BEARER_TOKEN` remains the archive-wide credential and can access every bearer-protected REST project route. To enable project-scoped invitations, configure `PROJECT_ACCESS_TOKEN_SECRET` with a separate signing key generated with `openssl rand -base64 32`. The server can then mint a project-only bearer credential through `POST /projects/:projectPublicId/accessTokens`; that credential makes `GET /projects` return only its authorized project and returns the normal project-not-found response for any other project. Rotating the signing key revokes all previously minted project credentials. Project-scoped credentials do not change `/sync/:projectPublicId` or CoMapeo membership/replication semantics.
 
 If you are using Nginx to act as a reverse proxy for your CoMapeo Cloud server, ensure your proxy headers are configured to support WebSockets.
 

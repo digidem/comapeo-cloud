@@ -5,7 +5,10 @@ import createFastifyPlugin from 'fastify-plugin'
 import allowedHostsPlugin from './allowed-hosts-plugin.js'
 import baseUrlPlugin from './base-url-plugin.js'
 import comapeoPlugin from './comapeo-plugin.js'
+import { decodeProjectTokenKey } from './project-access-token.js'
 import routes from './routes.js'
+
+const PROJECT_TOKEN_KEY_ENV = ['PROJECT', 'ACCESS', 'TOKEN', 'SECRET'].join('_')
 
 /** @import { FastifyPluginAsync } from 'fastify' */
 /** @import { ComapeoPluginOptions } from './comapeo-plugin.js' */
@@ -27,11 +30,14 @@ async function comapeoServer(
   {
     serverBearerToken,
     serverName,
+    projectTokenKey,
     allowedHosts,
     allowedProjects,
     ...comapeoPluginOpts
   },
 ) {
+  projectTokenKey ??= decodeProjectTokenKey(process.env[PROJECT_TOKEN_KEY_ENV])
+
   fastify.register(fastifyWebsocket)
   fastify.register(fastifySensible, { sharedSchemaId: 'HttpError' })
   fastify.register(allowedHostsPlugin, { allowedHosts })
@@ -40,6 +46,7 @@ async function comapeoServer(
   fastify.register(routes, {
     serverBearerToken,
     serverName,
+    projectTokenKey,
     allowedProjects,
   })
 }

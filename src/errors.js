@@ -30,6 +30,20 @@ export const badRequestError = (message) =>
 export const invalidBearerToken = () =>
   new HttpError(401, 'UNAUTHORIZED', 'Invalid bearer token')
 
+export const projectAccessTokensUnavailable = () =>
+  new HttpError(
+    501,
+    'PROJECT_ACCESS_TOKENS_UNAVAILABLE',
+    'Project access tokens are not configured on this server',
+  )
+
+export const archiveCredentialRequired = () =>
+  new HttpError(
+    403,
+    'ARCHIVE_CREDENTIAL_REQUIRED',
+    'Archive-wide credential required',
+  )
+
 export const projectNotInAllowlist = () =>
   new HttpError(403, 'PROJECT_NOT_IN_ALLOWLIST', 'Project not allowed')
 
