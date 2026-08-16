@@ -12,6 +12,10 @@ import { Observation as observationSchema } from './datatypes/observation.js'
 import { Preset as presetSchema } from './datatypes/preset.js'
 import { Track as trackSchema } from './datatypes/track.js'
 import * as errors from './errors.js'
+import {
+  createProjectAccessToken,
+  verifyProjectAccessToken,
+} from './project-access-token.js'
 import * as schemas from './schemas.js'
 import { HEX_STRING_32_BYTES } from './schemas.js'
 import { wsCoreReplicator } from './ws-core-replicator.js'
@@ -44,26 +48,65 @@ const SUPPORTED_ATTACHMENT_TYPES = new Set(
  * @typedef {object} RouteOptions
  * @prop {string} serverBearerToken
  * @prop {string} serverName
+ * @prop {Buffer} [projectTokenKey]
  * @prop {undefined | number | string[]} [allowedProjects=1]
  */
 
 /** @type {FastifyPluginAsync<RouteOptions, RawServerDefault, TypeBoxTypeProvider>} */
 export default async function routes(
   fastify,
-  { serverBearerToken, serverName, allowedProjects = 1 },
+  { serverBearerToken, serverName, projectTokenKey, allowedProjects = 1 },
 ) {
   /** @type {Set<string> | number} */
   const allowedProjectsSetOrNumber = Array.isArray(allowedProjects)
     ? new Set(allowedProjects)
     : allowedProjects
 
+  /** @typedef {{type: 'archive'} | {type: 'project', projectId: string}} AuthorizationPrincipal */
+
   /**
+   * Resolve a bearer credential to an authorization principal. Archive-wide
+   * auth remains backward compatible; valid project tokens are accepted only
+   * when the optional signing secret is configured.
+   *
    * @param {FastifyRequest} req
+   * @returns {AuthorizationPrincipal}
    */
-  const verifyBearerAuth = (req) => {
-    if (!isBearerTokenValid(req.headers.authorization, serverBearerToken)) {
-      throw errors.invalidBearerToken()
+  const resolveBearerPrincipal = (req) => {
+    const authorization = req.headers.authorization
+    if (isBearerTokenValid(authorization, serverBearerToken)) {
+      return { type: 'archive' }
     }
+
+    const token = getBearerToken(authorization)
+    if (projectTokenKey && token) {
+      const projectId = verifyProjectAccessToken(projectTokenKey, token)
+      if (projectId) return { type: 'project', projectId }
+    }
+
+    throw errors.invalidBearerToken()
+  }
+
+  /** @param {FastifyRequest} req */
+  const requireArchivePrincipal = (req) => {
+    const principal = resolveBearerPrincipal(req)
+    if (principal.type !== 'archive') {
+      throw errors.archiveCredentialRequired()
+    }
+  }
+
+  /**
+   * @param {FastifyRequest & {params: {projectPublicId: string}}} req
+   */
+  const authorizeProjectRequest = async (req) => {
+    const principal = resolveBearerPrincipal(req)
+    if (
+      principal.type === 'project' &&
+      principal.projectId !== req.params.projectPublicId
+    ) {
+      throw errors.projectNotFoundError()
+    }
+    await ensureProjectExists(fastify, req)
   }
 
   fastify.setErrorHandler((error, _req, reply) => {
@@ -136,19 +179,58 @@ export default async function routes(
         },
       },
       async preHandler(req) {
-        verifyBearerAuth(req)
+        resolveBearerPrincipal(req)
       },
     },
     /**
      * @this {FastifyInstance}
      */
-    async function () {
+    async function (req) {
+      const principal = resolveBearerPrincipal(req)
       const projects = await this.comapeo.listProjects()
+      const visibleProjects =
+        principal.type === 'archive'
+          ? projects
+          : projects.filter(
+              (project) => project.projectId === principal.projectId,
+            )
       return {
-        data: projects.map((project) => ({
+        data: visibleProjects.map((project) => ({
           projectId: project.projectId,
           name: project.name,
         })),
+      }
+    },
+  )
+
+  fastify.post(
+    '/projects/:projectPublicId/accessTokens',
+    {
+      schema: {
+        params: Type.Object({ projectPublicId: BASE32_STRING_32_BYTES }),
+        response: {
+          200: Type.Object({ data: Type.Record(Type.String(), Type.String()) }),
+          '4xx': schemas.errorResponse,
+          501: schemas.errorResponse,
+        },
+      },
+      async preHandler(req) {
+        requireArchivePrincipal(req)
+        await ensureProjectExists(this, req)
+      },
+    },
+    async function (req) {
+      if (!projectTokenKey) throw errors.projectAccessTokensUnavailable()
+      const { projectPublicId } = req.params
+      const credential = createProjectAccessToken(
+        projectTokenKey,
+        projectPublicId,
+      )
+      return {
+        data: Object.fromEntries([
+          ['token', credential],
+          ['projectId', projectPublicId],
+        ]),
       }
     },
   )
@@ -321,8 +403,7 @@ export default async function routes(
         },
       },
       async preHandler(req) {
-        verifyBearerAuth(req)
-        await ensureProjectExists(this, req)
+        await authorizeProjectRequest(req)
       },
     },
     /**
@@ -364,8 +445,7 @@ export default async function routes(
         },
       },
       async preHandler(req) {
-        verifyBearerAuth(req)
-        await ensureProjectExists(this, req)
+        await authorizeProjectRequest(req)
       },
     },
     /**
@@ -407,8 +487,7 @@ export default async function routes(
         },
       },
       async preHandler(req) {
-        verifyBearerAuth(req)
-        await ensureProjectExists(this, req)
+        await authorizeProjectRequest(req)
       },
     },
     /**
@@ -479,8 +558,7 @@ export default async function routes(
         },
       },
       async preHandler(req) {
-        verifyBearerAuth(req)
-        await ensureProjectExists(this, req)
+        await authorizeProjectRequest(req)
       },
     },
     /**
@@ -562,8 +640,7 @@ export default async function routes(
           },
         },
         async preHandler(req) {
-          verifyBearerAuth(req)
-          await ensureProjectExists(this, req)
+          await authorizeProjectRequest(req)
         },
       },
       /**
@@ -608,8 +685,7 @@ export default async function routes(
           },
         },
         async preHandler(req) {
-          verifyBearerAuth(req)
-          await ensureProjectExists(this, req)
+          await authorizeProjectRequest(req)
         },
       },
       /**
@@ -693,6 +769,16 @@ function setAttachmentURL(obs, params) {
       })),
     presetRef: expandRef(obs.presetRef, 'preset', params),
   }
+}
+
+/**
+ * @param {undefined | string} headerValue
+ * @returns {string | null}
+ */
+function getBearerToken(headerValue = '') {
+  if (!headerValue.startsWith('Bearer ')) return null
+  const token = headerValue.slice(BEARER_SPACE_LENGTH)
+  return token.length > 0 ? token : null
 }
 
 /**
