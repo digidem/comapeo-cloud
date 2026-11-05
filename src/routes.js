@@ -40,6 +40,18 @@ const SUPPORTED_ATTACHMENT_TYPES = new Set(
   /** @type {const} */ (['photo', 'audio']),
 )
 
+// Headers that describe the upstream connection, not the attachment (RFC 9110 7.6.1)
+const HOP_BY_HOP_HEADERS = new Set([
+  'connection',
+  'keep-alive',
+  'proxy-authenticate',
+  'proxy-authorization',
+  'te',
+  'trailer',
+  'transfer-encoding',
+  'upgrade',
+])
+
 /**
  * @typedef {object} RouteOptions
  * @prop {string} serverBearerToken
@@ -518,9 +530,17 @@ export default async function routes(
         ...typeAndVariant,
       })
 
-      const proxiedResponse = await fetch(blobUrl)
+      let proxiedResponse
+      try {
+        proxiedResponse = await fetch(blobUrl)
+      } catch (err) {
+        // Core's blob server resets the socket when a blob's early blocks are missing
+        req.log.warn({ err }, 'attachment blob fetch failed')
+        throw errors.attachmentUpstreamUnavailableError()
+      }
       reply.code(proxiedResponse.status)
       for (const [headerName, headerValue] of proxiedResponse.headers) {
+        if (HOP_BY_HOP_HEADERS.has(headerName)) continue
         reply.header(headerName, headerValue)
       }
       return reply.send(proxiedResponse.body)
