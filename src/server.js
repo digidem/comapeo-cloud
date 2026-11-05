@@ -81,6 +81,9 @@ const fastify = createFastify({
   trustProxy: true,
   maxParamLength: 256,
 })
+process.on('unhandledRejection', (err) => {
+  fastify.log.error({ err }, 'unhandled promise rejection')
+})
 fastify.register(comapeoServer, {
   serverName: config.SERVER_NAME,
   serverBearerToken: config.SERVER_BEARER_TOKEN,
