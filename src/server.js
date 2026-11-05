@@ -33,6 +33,12 @@ const schema = Type.Object({
       description: 'number of projects allowed to join the server',
     }),
   ),
+  SENTRY_DSN: Type.Optional(
+    Type.String({
+      description:
+        'Sentry DSN; error and attachment reporting is off when unset',
+    }),
+  ),
   AUDIT_MAX_ATTACHMENTS: Type.Integer({
     minimum: 1,
     default: 200,
@@ -43,6 +49,33 @@ const schema = Type.Object({
 /** @typedef {import('@sinclair/typebox').Static<typeof schema>} Env */
 /** @type {ReturnType<typeof envSchema<Env>>} */
 const config = envSchema({ schema, dotenv: true })
+
+/** @type {typeof import('@sentry/node') | undefined} */
+let Sentry
+if (config.SENTRY_DSN) {
+  // Loaded on demand: importing it costs about 50 MB RSS
+  Sentry = await import('@sentry/node')
+  const { version } = JSON.parse(
+    await fsPromises.readFile(
+      new URL('../package.json', import.meta.url),
+      'utf8',
+    ),
+  )
+  Sentry.init({
+    dsn: config.SENTRY_DSN,
+    release: `comapeo-cloud@${version}`,
+    // Only manual captures are used; fastify and core are already imported
+    registerEsmLoaderHooks: false,
+    // Sentry's default 'warn' mode would stop unhandled rejections crashing the process
+    integrations: [Sentry.onUnhandledRejectionIntegration({ mode: 'strict' })],
+    beforeSend(event) {
+      // Request headers carry the bearer token
+      delete event.request?.headers
+      delete event.request?.cookies
+      return event
+    },
+  })
+}
 
 const coreStorage = path.join(config.STORAGE_DIR, CORE_DIR_NAME)
 const dbFolder = path.join(config.STORAGE_DIR, DB_DIR_NAME)
@@ -95,6 +128,7 @@ fastify.register(comapeoServer, {
   dbFolder,
   projectMigrationsFolder,
   clientMigrationsFolder,
+  ...(Sentry && { captureMessage: Sentry.captureMessage }),
   auditMaxAttachments: config.AUDIT_MAX_ATTACHMENTS,
 })
 
@@ -111,6 +145,7 @@ try {
 async function closeGracefully(signal) {
   console.log(`Received signal to terminate: ${signal}`)
   await fastify.close()
+  await Sentry?.close(2000)
   console.log('Gracefully closed fastify')
   process.kill(process.pid, signal)
 }

@@ -29,6 +29,7 @@ Server configuration is done using environment variables. The following environm
 | `SERVER_NAME`           | No       | Friendly server name, seen by users when adding server                | `CoMapeo Server` |
 | `ALLOWED_PROJECTS`      | No       | Number of projects allowed to register with the server                | `1`              |
 | `STORAGE_DIR`           | No       | Path for storing app & project data                                   | `$CWD/data`      |
+| `SENTRY_DSN`            | No       | Sentry DSN. Reports crashes and attachments that could not be served  |                  |
 | `AUDIT_MAX_ATTACHMENTS` | No       | Attachments checked per project by the attachment audit, newest first | `200`            |
 
 If you are using Nginx to act as a reverse proxy for your CoMapeo Cloud server, ensure your proxy headers are configured to support WebSockets.
