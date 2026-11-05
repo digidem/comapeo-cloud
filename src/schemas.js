@@ -14,6 +14,43 @@ export const errorResponse = Type.Object({
   }),
 })
 
+const attachmentStatus = Type.Union([
+  Type.Literal('ok'),
+  Type.Literal('missing'),
+  Type.Literal('incomplete'),
+  Type.Literal('error'),
+])
+
+export const attachmentAudit = Type.Object({
+  observations: Type.Integer(),
+  attachments: Type.Integer({
+    description: 'photo and audio attachments found on observations',
+  }),
+  audited: Type.Integer({
+    description: 'attachments whose variants were read',
+  }),
+  ok: Type.Integer({ description: 'variants read to the end' }),
+  missing: Type.Integer({ description: 'variants not found (404)' }),
+  incomplete: Type.Integer({
+    description: 'variants that reset or ended before their last byte',
+  }),
+  error: Type.Integer({ description: 'variants that failed in any other way' }),
+  failures: Type.Array(
+    Type.Object({
+      driveDiscoveryId: Type.String(),
+      type: Type.Union([Type.Literal('photo'), Type.Literal('audio')]),
+      name: Type.String(),
+      variant: Type.Union([
+        Type.Literal('original'),
+        Type.Literal('preview'),
+        Type.Literal('thumbnail'),
+      ]),
+      status: attachmentStatus,
+      detail: Type.String(),
+    }),
+  ),
+})
+
 export const projectToAdd = Type.Object({
   projectName: Type.String({ minLength: 1 }),
   projectKey: HEX_STRING_32_BYTES,

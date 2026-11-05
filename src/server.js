@@ -7,6 +7,7 @@ import fsPromises from 'node:fs/promises'
 import path from 'node:path'
 
 import comapeoServer from './app.js'
+import { auditAttachments } from './attachments-audit.js'
 
 const DEFAULT_STORAGE = path.join(process.cwd(), 'data')
 const CORE_DIR_NAME = 'core'
@@ -33,11 +34,55 @@ const schema = Type.Object({
       description: 'number of projects allowed to join the server',
     }),
   ),
+  SENTRY_DSN: Type.Optional(
+    Type.String({
+      description:
+        'Sentry DSN; error and attachment reporting is off when unset',
+    }),
+  ),
+  AUDIT_INTERVAL_MS: Type.Integer({
+    minimum: 0,
+    default: 60 * 60 * 1000,
+    description:
+      'how often to audit attachments and report counts to Sentry, 0 disables',
+  }),
+  AUDIT_MAX_ATTACHMENTS: Type.Integer({
+    minimum: 1,
+    default: 200,
+    description: 'attachments checked per project per audit, newest first',
+  }),
 })
 
 /** @typedef {import('@sinclair/typebox').Static<typeof schema>} Env */
 /** @type {ReturnType<typeof envSchema<Env>>} */
 const config = envSchema({ schema, dotenv: true })
+
+/** @type {typeof import('@sentry/node') | undefined} */
+let Sentry
+if (config.SENTRY_DSN) {
+  // Loaded on demand: importing it costs about 50 MB RSS
+  Sentry = await import('@sentry/node')
+  const { version } = JSON.parse(
+    await fsPromises.readFile(
+      new URL('../package.json', import.meta.url),
+      'utf8',
+    ),
+  )
+  Sentry.init({
+    dsn: config.SENTRY_DSN,
+    release: `comapeo-cloud@${version}`,
+    // Only manual captures are used; fastify and core are already imported
+    registerEsmLoaderHooks: false,
+    // Sentry's default 'warn' mode would stop unhandled rejections crashing the process
+    integrations: [Sentry.onUnhandledRejectionIntegration({ mode: 'strict' })],
+    beforeSend(event) {
+      // Request headers carry the bearer token
+      delete event.request?.headers
+      delete event.request?.cookies
+      return event
+    },
+  })
+}
 
 const coreStorage = path.join(config.STORAGE_DIR, CORE_DIR_NAME)
 const dbFolder = path.join(config.STORAGE_DIR, DB_DIR_NAME)
@@ -90,6 +135,8 @@ fastify.register(comapeoServer, {
   dbFolder,
   projectMigrationsFolder,
   clientMigrationsFolder,
+  ...(Sentry && { captureMessage: Sentry.captureMessage }),
+  auditMaxAttachments: config.AUDIT_MAX_ATTACHMENTS,
 })
 
 fastify.get('/healthcheck', async () => {})
@@ -101,10 +148,52 @@ try {
   process.exit(1)
 }
 
+/** @type {NodeJS.Timeout | undefined} */
+let auditInterval
+if (Sentry && config.AUDIT_INTERVAL_MS > 0) {
+  let auditRunning = false
+  const runAudit = () => {
+    if (auditRunning) return
+    auditRunning = true
+    auditAllProjects()
+      .catch((err) => fastify.log.error(err))
+      .finally(() => {
+        auditRunning = false
+      })
+  }
+  // Machines that suspend when idle may never reach the first interval
+  setTimeout(runAudit, Math.min(60_000, config.AUDIT_INTERVAL_MS)).unref()
+  auditInterval = setInterval(runAudit, config.AUDIT_INTERVAL_MS).unref()
+}
+
+async function auditAllProjects() {
+  for (const { projectId } of await fastify.comapeo.listProjects()) {
+    try {
+      const project = await fastify.comapeo.getProject(projectId)
+      const { failures, ...counts } = await auditAttachments(project, {
+        maxAttachments: config.AUDIT_MAX_ATTACHMENTS,
+      })
+      fastify.log.info({ projectId, ...counts }, 'attachment audit')
+      Sentry?.captureMessage('attachment.audit', {
+        level: failures.length ? 'warning' : 'info',
+        tags: { project: projectId },
+        contexts: { audit: counts },
+        extra: { failures: failures.slice(0, 100) },
+        fingerprint: ['attachment.audit', projectId],
+      })
+    } catch (err) {
+      fastify.log.error({ err, projectId }, 'attachment audit failed')
+      Sentry?.captureException(err, { tags: { project: projectId } })
+    }
+  }
+}
+
 /** @param {NodeJS.Signals} signal*/
 async function closeGracefully(signal) {
   console.log(`Received signal to terminate: ${signal}`)
+  clearInterval(auditInterval)
   await fastify.close()
+  await Sentry?.close(2000)
   console.log('Gracefully closed fastify')
   process.kill(process.pid, signal)
 }

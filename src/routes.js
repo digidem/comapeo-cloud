@@ -7,6 +7,11 @@ import assert from 'node:assert/strict'
 import * as fs from 'node:fs'
 import { STATUS_CODES } from 'node:http'
 
+import {
+  auditAttachments,
+  fetchFailure,
+  upstreamFailure,
+} from './attachments-audit.js'
 import { Field as fieldSchema } from './datatypes/field.js'
 import { Observation as observationSchema } from './datatypes/observation.js'
 import { Preset as presetSchema } from './datatypes/preset.js'
@@ -28,6 +33,11 @@ import { wsCoreReplicator } from './ws-core-replicator.js'
 /** @typedef {{baseUrl: URL, projectPublicId: string, project: MapeoProject}} MapDocParam */
 /** @typedef {{docId: string, versionId: string}} Ref*/
 /** @typedef {{docId: string, versionId: string, url: string}} UrlRef */
+/** @import { AttachmentCheck } from './attachments-audit.js' */
+/**
+ * Shaped like Sentry's captureMessage so it can be passed through directly
+ * @typedef {(message: string, context: { level: 'info' | 'warning', tags: Record<string, string | number>, extra?: Record<string, unknown>, fingerprint?: string[] }) => unknown} CaptureMessage
+ */
 
 const BEARER_SPACE_LENGTH = 'Bearer '.length
 
@@ -57,12 +67,20 @@ const HOP_BY_HOP_HEADERS = new Set([
  * @prop {string} serverBearerToken
  * @prop {string} serverName
  * @prop {undefined | number | string[]} [allowedProjects=1]
+ * @prop {CaptureMessage} [captureMessage] receives one event per attachment that could not be served
+ * @prop {number} [auditMaxAttachments] cap on attachments checked per audit
  */
 
 /** @type {FastifyPluginAsync<RouteOptions, RawServerDefault, TypeBoxTypeProvider>} */
 export default async function routes(
   fastify,
-  { serverBearerToken, serverName, allowedProjects = 1 },
+  {
+    serverBearerToken,
+    serverName,
+    allowedProjects = 1,
+    captureMessage,
+    auditMaxAttachments,
+  },
 ) {
   /** @type {Set<string> | number} */
   const allowedProjectsSetOrNumber = Array.isArray(allowedProjects)
@@ -530,20 +548,90 @@ export default async function routes(
         ...typeAndVariant,
       })
 
+      /**
+       * @param {AttachmentCheck} check
+       * @param {number} httpStatus sent to the client
+       * @param {unknown} [err]
+       */
+      const reportFailure = (check, httpStatus, err) => {
+        req.log.warn(
+          { err, ...check, blobUrl },
+          'attachment could not be served',
+        )
+        captureMessage?.('attachment.nonok', {
+          level: 'warning',
+          tags: {
+            project: req.params.projectPublicId,
+            drive: req.params.driveDiscoveryId.slice(0, 7),
+            type: typeAndVariant.type,
+            variant: typeAndVariant.variant,
+            class: check.status,
+            http_status: httpStatus,
+            ...(check.upstreamCode && { upstream_code: check.upstreamCode }),
+          },
+          extra: { detail: check.detail },
+          fingerprint: [
+            'attachment.nonok',
+            check.status,
+            check.upstreamCode ?? '',
+          ],
+        })
+      }
+
       let proxiedResponse
       try {
         proxiedResponse = await fetch(blobUrl)
       } catch (err) {
         // Core's blob server resets the socket when a blob's early blocks are missing
-        req.log.warn({ err }, 'attachment blob fetch failed')
-        throw errors.attachmentUpstreamUnavailableError()
+        const error = errors.attachmentUpstreamUnavailableError()
+        reportFailure(fetchFailure(err), error.statusCode, err)
+        throw error
       }
       reply.code(proxiedResponse.status)
       for (const [headerName, headerValue] of proxiedResponse.headers) {
         if (HOP_BY_HOP_HEADERS.has(headerName)) continue
         reply.header(headerName, headerValue)
       }
+      if (proxiedResponse.status !== 200) {
+        const body = await proxiedResponse.text()
+        reportFailure(
+          upstreamFailure(proxiedResponse, body),
+          proxiedResponse.status,
+        )
+        return reply.send(body)
+      }
       return reply.send(proxiedResponse.body)
+    },
+  )
+
+  fastify.get(
+    '/projects/:projectPublicId/attachments/audit',
+    {
+      schema: {
+        params: Type.Object({
+          projectPublicId: BASE32_STRING_32_BYTES,
+        }),
+        response: {
+          200: Type.Object({
+            data: schemas.attachmentAudit,
+          }),
+          '4xx': schemas.errorResponse,
+        },
+      },
+      async preHandler(req) {
+        verifyBearerAuth(req)
+        await ensureProjectExists(this, req)
+      },
+    },
+    /**
+     * @this {FastifyInstance}
+     */
+    async function (req) {
+      const project = await this.comapeo.getProject(req.params.projectPublicId)
+      const data = await auditAttachments(project, {
+        maxAttachments: auditMaxAttachments,
+      })
+      return { data }
     },
   )
 
