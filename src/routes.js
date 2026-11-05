@@ -277,7 +277,10 @@ export default async function routes(
       // The preValidation hook ensures that the project exists
       const project = await this.comapeo.getProject(req.params.projectPublicId)
       const replicationStream = replicateProject(project, false)
-      wsCoreReplicator(socket, replicationStream)
+      wsCoreReplicator(socket, replicationStream).catch((err) => {
+        req.log.warn({ err }, 'sync websocket replication failed')
+        if (socket.readyState === socket.OPEN) socket.terminate()
+      })
       project.$sync.start()
     },
   )
