@@ -279,7 +279,7 @@ export default async function routes(
       const replicationStream = replicateProject(project, false)
       wsCoreReplicator(socket, replicationStream).catch((err) => {
         req.log.warn({ err }, 'sync websocket replication failed')
-        if (socket.readyState === socket.OPEN) socket.terminate()
+        socket.terminate()
       })
       project.$sync.start()
     },
