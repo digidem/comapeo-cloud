@@ -29,6 +29,7 @@ async function comapeoServer(
     serverName,
     allowedHosts,
     allowedProjects,
+    captureMessage,
     auditMaxAttachments,
     ...comapeoPluginOpts
   },
@@ -42,6 +43,7 @@ async function comapeoServer(
     serverBearerToken,
     serverName,
     allowedProjects,
+    captureMessage,
     auditMaxAttachments,
   })
 }
