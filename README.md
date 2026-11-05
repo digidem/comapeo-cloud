@@ -22,13 +22,14 @@ Or use the [`Dockerfile`](./Dockerfile) to build a Docker image.
 
 Server configuration is done using environment variables. The following environment variables are available:
 
-| Environment Variable  | Required | Description                                                          | Default Value    |
-| --------------------- | -------- | -------------------------------------------------------------------- | ---------------- |
-| `SERVER_BEARER_TOKEN` | Yes      | Token for authenticating API requests. Should be large random string |                  |
-| `PORT`                | No       | Port on which the server runs                                        | `8080`           |
-| `SERVER_NAME`         | No       | Friendly server name, seen by users when adding server               | `CoMapeo Server` |
-| `ALLOWED_PROJECTS`    | No       | Number of projects allowed to register with the server               | `1`              |
-| `STORAGE_DIR`         | No       | Path for storing app & project data                                  | `$CWD/data`      |
+| Environment Variable    | Required | Description                                                           | Default Value    |
+| ----------------------- | -------- | --------------------------------------------------------------------- | ---------------- |
+| `SERVER_BEARER_TOKEN`   | Yes      | Token for authenticating API requests. Should be large random string  |                  |
+| `PORT`                  | No       | Port on which the server runs                                         | `8080`           |
+| `SERVER_NAME`           | No       | Friendly server name, seen by users when adding server                | `CoMapeo Server` |
+| `ALLOWED_PROJECTS`      | No       | Number of projects allowed to register with the server                | `1`              |
+| `STORAGE_DIR`           | No       | Path for storing app & project data                                   | `$CWD/data`      |
+| `AUDIT_MAX_ATTACHMENTS` | No       | Attachments checked per project by the attachment audit, newest first | `200`            |
 
 If you are using Nginx to act as a reverse proxy for your CoMapeo Cloud server, ensure your proxy headers are configured to support WebSockets.
 

@@ -7,6 +7,7 @@ import assert from 'node:assert/strict'
 import * as fs from 'node:fs'
 import { STATUS_CODES } from 'node:http'
 
+import { auditAttachments } from './attachments-audit.js'
 import { Field as fieldSchema } from './datatypes/field.js'
 import { Observation as observationSchema } from './datatypes/observation.js'
 import { Preset as presetSchema } from './datatypes/preset.js'
@@ -57,12 +58,13 @@ const HOP_BY_HOP_HEADERS = new Set([
  * @prop {string} serverBearerToken
  * @prop {string} serverName
  * @prop {undefined | number | string[]} [allowedProjects=1]
+ * @prop {number} [auditMaxAttachments] cap on attachments checked per audit
  */
 
 /** @type {FastifyPluginAsync<RouteOptions, RawServerDefault, TypeBoxTypeProvider>} */
 export default async function routes(
   fastify,
-  { serverBearerToken, serverName, allowedProjects = 1 },
+  { serverBearerToken, serverName, allowedProjects = 1, auditMaxAttachments },
 ) {
   /** @type {Set<string> | number} */
   const allowedProjectsSetOrNumber = Array.isArray(allowedProjects)
@@ -544,6 +546,37 @@ export default async function routes(
         reply.header(headerName, headerValue)
       }
       return reply.send(proxiedResponse.body)
+    },
+  )
+
+  fastify.get(
+    '/projects/:projectPublicId/attachments/audit',
+    {
+      schema: {
+        params: Type.Object({
+          projectPublicId: BASE32_STRING_32_BYTES,
+        }),
+        response: {
+          200: Type.Object({
+            data: schemas.attachmentAudit,
+          }),
+          '4xx': schemas.errorResponse,
+        },
+      },
+      async preHandler(req) {
+        verifyBearerAuth(req)
+        await ensureProjectExists(this, req)
+      },
+    },
+    /**
+     * @this {FastifyInstance}
+     */
+    async function (req) {
+      const project = await this.comapeo.getProject(req.params.projectPublicId)
+      const data = await auditAttachments(project, {
+        maxAttachments: auditMaxAttachments,
+      })
+      return { data }
     },
   )
 

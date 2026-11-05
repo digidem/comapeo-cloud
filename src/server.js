@@ -33,6 +33,11 @@ const schema = Type.Object({
       description: 'number of projects allowed to join the server',
     }),
   ),
+  AUDIT_MAX_ATTACHMENTS: Type.Integer({
+    minimum: 1,
+    default: 200,
+    description: 'attachments checked per project per audit, newest first',
+  }),
 })
 
 /** @typedef {import('@sinclair/typebox').Static<typeof schema>} Env */
@@ -90,6 +95,7 @@ fastify.register(comapeoServer, {
   dbFolder,
   projectMigrationsFolder,
   clientMigrationsFolder,
+  auditMaxAttachments: config.AUDIT_MAX_ATTACHMENTS,
 })
 
 fastify.get('/healthcheck', async () => {})
