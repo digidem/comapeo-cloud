@@ -97,7 +97,9 @@ export async function checkBlob(blobUrl) {
 }
 
 /**
- * Check every variant of every photo and audio attachment in a project
+ * Check every variant of every photo and audio attachment in a project. Each
+ * failure carries the device that created the observation, since that is the
+ * device that has to sync again, and `devices` names those devices.
  * @param {MapeoProject} project
  * @param {object} [options]
  * @param {number} [options.maxAttachments] newest observations first
@@ -120,14 +122,20 @@ export async function auditAttachments(
     incomplete: 0,
     error: 0,
     failures: [],
+    devices: {},
   }
 
   const attachments = observations.flatMap((obs) =>
-    obs.attachments.filter(isSupportedAttachment),
+    obs.attachments
+      .filter(isSupportedAttachment)
+      .map((attachment) => ({ attachment, createdBy: obs.createdBy })),
   )
   result.attachments = attachments.length
 
-  for (const attachment of attachments.slice(0, maxAttachments)) {
+  for (const { attachment, createdBy } of attachments.slice(
+    0,
+    maxAttachments,
+  )) {
     const { driveDiscoveryId, type, name } = attachment
     result.audited++
     for (const variant of VARIANTS[type]) {
@@ -144,6 +152,7 @@ export async function auditAttachments(
       if (check.status !== 'ok') {
         result.failures.push({
           driveDiscoveryId,
+          createdBy,
           type,
           name,
           variant,
@@ -151,6 +160,14 @@ export async function auditAttachments(
           detail: check.detail,
         })
       }
+    }
+  }
+
+  if (result.failures.length > 0) {
+    const members = await project.$member.getMany({ includeLeft: true })
+    const createdBy = new Set(result.failures.map((f) => f.createdBy))
+    for (const { deviceId, name } of members) {
+      if (name && createdBy.has(deviceId)) result.devices[deviceId] = name
     }
   }
 

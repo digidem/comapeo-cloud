@@ -38,6 +38,9 @@ export const attachmentAudit = Type.Object({
   failures: Type.Array(
     Type.Object({
       driveDiscoveryId: Type.String(),
+      createdBy: Type.String({
+        description: 'device id of the device that created the observation',
+      }),
       type: Type.Union([Type.Literal('photo'), Type.Literal('audio')]),
       name: Type.String(),
       variant: Type.Union([
@@ -49,6 +52,10 @@ export const attachmentAudit = Type.Object({
       detail: Type.String(),
     }),
   ),
+  devices: Type.Record(Type.String(), Type.String(), {
+    description:
+      'name of each device that appears in failures, by device id, where the project knows it',
+  }),
 })
 
 export const projectToAdd = Type.Object({

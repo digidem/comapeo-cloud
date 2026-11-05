@@ -170,7 +170,7 @@ async function auditAllProjects() {
   for (const { projectId } of await fastify.comapeo.listProjects()) {
     try {
       const project = await fastify.comapeo.getProject(projectId)
-      const { failures, ...counts } = await auditAttachments(project, {
+      const { failures, devices, ...counts } = await auditAttachments(project, {
         maxAttachments: config.AUDIT_MAX_ATTACHMENTS,
       })
       fastify.log.info({ projectId, ...counts }, 'attachment audit')
@@ -178,7 +178,7 @@ async function auditAllProjects() {
         level: failures.length ? 'warning' : 'info',
         tags: { project: projectId },
         contexts: { audit: counts },
-        extra: { failures: failures.slice(0, 100) },
+        extra: { failures: failures.slice(0, 100), devices },
         fingerprint: ['attachment.audit', projectId],
       })
     } catch (err) {

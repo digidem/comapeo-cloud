@@ -33,6 +33,10 @@ test('counts every attachment variant and reports the partly synced one', async 
   const server = createTestServer(t)
   await server.listen()
 
+  await server.comapeo.setDeviceInfo({
+    deviceType: 'selfHostedServer',
+    name: 'test server',
+  })
   const projectPublicId = await server.comapeo.createProject({
     name: 'project',
   })
@@ -67,7 +71,7 @@ test('counts every attachment variant and reports the partly synced one', async 
   })
   assert.equal(response.statusCode, 200)
   /** @type {import('../src/attachments-audit.js').AttachmentAudit} */
-  const { failures, ...counts } = response.json().data
+  const { failures, devices, ...counts } = response.json().data
   // 3 attachments: two photos with 3 variants each, one audio with 1
   assert.deepEqual(counts, {
     observations: 2,
@@ -83,6 +87,7 @@ test('counts every attachment variant and reports the partly synced one', async 
     [
       {
         driveDiscoveryId: partialPhoto.driveId,
+        createdBy: server.comapeo.deviceId,
         type: 'photo',
         name: partialPhoto.name,
         variant: 'original',
@@ -90,4 +95,5 @@ test('counts every attachment variant and reports the partly synced one', async 
       },
     ],
   )
+  assert.deepEqual(devices, { [server.comapeo.deviceId]: 'test server' })
 })
