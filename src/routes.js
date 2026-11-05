@@ -69,6 +69,7 @@ const HOP_BY_HOP_HEADERS = new Set([
  * @prop {undefined | number | string[]} [allowedProjects=1]
  * @prop {CaptureMessage} [captureMessage] receives one event per attachment that could not be served
  * @prop {number} [auditMaxAttachments] cap on attachments checked per audit
+ * @prop {(project: MapeoProject, projectPublicId: string) => void} [onProjectAdded] called once for each project PUT /projects adds
  */
 
 /** @type {FastifyPluginAsync<RouteOptions, RawServerDefault, TypeBoxTypeProvider>} */
@@ -80,6 +81,7 @@ export default async function routes(
     allowedProjects = 1,
     captureMessage,
     auditMaxAttachments,
+    onProjectAdded,
   },
 ) {
   /** @type {Set<string> | number} */
@@ -275,6 +277,7 @@ export default async function routes(
 
       const project = await this.comapeo.getProject(projectPublicId)
       project.$sync.start()
+      if (!alreadyHasThisProject) onProjectAdded?.(project, projectPublicId)
 
       return {
         data: {

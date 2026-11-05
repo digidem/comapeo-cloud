@@ -7,6 +7,8 @@ import fsPromises from 'node:fs/promises'
 import path from 'node:path'
 
 import comapeoServer from './app.js'
+import { AttachmentAuditScheduler } from './attachment-audit-scheduler.js'
+import { auditAttachments } from './attachments-audit.js'
 
 const DEFAULT_STORAGE = path.join(process.cwd(), 'data')
 const CORE_DIR_NAME = 'core'
@@ -39,6 +41,12 @@ const schema = Type.Object({
         'Sentry DSN; error and attachment reporting is off when unset',
     }),
   ),
+  AUDIT_MIN_INTERVAL_MS: Type.Integer({
+    minimum: 0,
+    default: 60 * 60 * 1000,
+    description:
+      'audit a project after each sync, at most this often; 0 disables',
+  }),
   AUDIT_MAX_ATTACHMENTS: Type.Integer({
     minimum: 1,
     default: 200,
@@ -119,6 +127,16 @@ const fastify = createFastify({
   trustProxy: true,
   maxParamLength: 256,
 })
+/** @type {AttachmentAuditScheduler | undefined} */
+let auditScheduler
+if (Sentry && config.AUDIT_MIN_INTERVAL_MS > 0) {
+  auditScheduler = new AttachmentAuditScheduler({
+    minIntervalMs: config.AUDIT_MIN_INTERVAL_MS,
+    audit: auditProject,
+    log: fastify.log,
+  })
+}
+
 fastify.register(comapeoServer, {
   serverName: config.SERVER_NAME,
   serverBearerToken: config.SERVER_BEARER_TOKEN,
@@ -130,6 +148,8 @@ fastify.register(comapeoServer, {
   clientMigrationsFolder,
   ...(Sentry && { captureMessage: Sentry.captureMessage }),
   auditMaxAttachments: config.AUDIT_MAX_ATTACHMENTS,
+  onProjectAdded: (project, projectId) =>
+    auditScheduler?.watch(projectId, project),
 })
 
 fastify.get('/healthcheck', async () => {})
@@ -141,9 +161,38 @@ try {
   process.exit(1)
 }
 
+if (auditScheduler) {
+  for (const { projectId } of await fastify.comapeo.listProjects()) {
+    auditScheduler.watch(projectId, await fastify.comapeo.getProject(projectId))
+  }
+}
+
+/** @param {string} projectId */
+async function auditProject(projectId) {
+  try {
+    const project = await fastify.comapeo.getProject(projectId)
+    const { failures, devices, ...counts } = await auditAttachments(project, {
+      maxAttachments: config.AUDIT_MAX_ATTACHMENTS,
+    })
+    fastify.log.info({ projectId, ...counts }, 'attachment audit')
+    if (failures.length === 0) return
+    Sentry?.captureMessage('attachment.audit', {
+      level: 'warning',
+      tags: { project: projectId },
+      contexts: { audit: counts },
+      extra: { failures: failures.slice(0, 100), devices },
+      fingerprint: ['attachment.audit', projectId],
+    })
+  } catch (err) {
+    fastify.log.error({ err, projectId }, 'attachment audit failed')
+    Sentry?.captureException(err, { tags: { project: projectId } })
+  }
+}
+
 /** @param {NodeJS.Signals} signal*/
 async function closeGracefully(signal) {
   console.log(`Received signal to terminate: ${signal}`)
+  auditScheduler?.close()
   await fastify.close()
   await Sentry?.close(2000)
   console.log('Gracefully closed fastify')

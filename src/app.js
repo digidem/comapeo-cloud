@@ -31,6 +31,7 @@ async function comapeoServer(
     allowedProjects,
     captureMessage,
     auditMaxAttachments,
+    onProjectAdded,
     ...comapeoPluginOpts
   },
 ) {
@@ -45,6 +46,7 @@ async function comapeoServer(
     allowedProjects,
     captureMessage,
     auditMaxAttachments,
+    onProjectAdded,
   })
 }
 

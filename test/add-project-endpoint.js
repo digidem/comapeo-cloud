@@ -221,3 +221,22 @@ test('adding the same project twice is idempotent', async (t) => {
   })
   assert.equal(secondResponse.statusCode, 200)
 })
+
+test('hands a newly added project to onProjectAdded', async (t) => {
+  /** @type {Array<{ projectPublicId: string, hasSync: boolean }>} */
+  const added = []
+  const server = createTestServer(t, {
+    onProjectAdded(project, projectPublicId) {
+      added.push({ projectPublicId, hasSync: Boolean(project.$sync) })
+    },
+  })
+  const body = randomAddProjectBody()
+  const projectPublicId = projectKeyToPublicId(
+    Buffer.from(body.projectKey, 'hex'),
+  )
+
+  await server.inject({ method: 'PUT', url: '/projects', body })
+  await server.inject({ method: 'PUT', url: '/projects', body })
+
+  assert.deepEqual(added, [{ projectPublicId, hasSync: true }])
+})
