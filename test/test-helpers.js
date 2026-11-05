@@ -9,6 +9,9 @@ import RAM from 'random-access-memory'
 
 import assert from 'node:assert/strict'
 import { randomBytes } from 'node:crypto'
+import * as fs from 'node:fs/promises'
+import * as os from 'node:os'
+import * as path from 'node:path'
 import { setTimeout as delay } from 'node:timers/promises'
 import { fileURLToPath } from 'node:url'
 
@@ -20,7 +23,26 @@ import comapeoServer from '../src/app.js'
 /** @import { ServerOptions } from '../src/app.js' */
 /** @import { MapeoProject } from '@comapeo/core' */
 
+// Test-only internals, not in core's package exports or public types
+const { kBlobStore, kCoreManager } = await import(
+  new URL('../node_modules/@comapeo/core/src/mapeo-project.js', import.meta.url)
+    .href
+)
+
 export const BEARER_TOKEN = Buffer.from('swordfish').toString('base64')
+
+const FIXTURES_ROOT = new URL('./fixtures/', import.meta.url)
+export const FIXTURE_IMAGE_ORIGINAL_PATH = new URL(
+  'original.jpg',
+  FIXTURES_ROOT,
+).pathname
+export const FIXTURE_IMAGE_PREVIEW_PATH = new URL('preview.jpg', FIXTURES_ROOT)
+  .pathname
+export const FIXTURE_IMAGE_THUMBNAIL_PATH = new URL(
+  'thumbnail.jpg',
+  FIXTURES_ROOT,
+).pathname
+export const FIXTURE_AUDIO_PATH = new URL('audio.mp3', FIXTURES_ROOT).pathname
 
 const TEST_SERVER_DEFAULTS = {
   serverName: 'test server',
@@ -203,4 +225,59 @@ export function generateTrack() {
   const trackDoc = generate('track', { count: 1 })[0]
   assert(trackDoc)
   return valueOf(trackDoc)
+}
+
+/**
+ * @param {object} blob
+ * @param {string} blob.driveId
+ * @param {'photo' | 'audio' | 'video'} blob.type
+ * @param {string} blob.name
+ * @param {string} blob.hash
+ */
+export function blobToAttachment(blob) {
+  return {
+    driveDiscoveryId: blob.driveId,
+    type: blob.type,
+    name: blob.name,
+    hash: blob.hash,
+    external: false,
+  }
+}
+
+/**
+ * Create a photo whose original has only its first block, like one caught
+ * mid-way through sync
+ * @param {TestContext} t
+ * @param {MapeoProject} project
+ */
+export async function createPartialPhotoBlob(t, project) {
+  const internals = /** @type {any} */ (project)
+
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'comapeo-cloud-test-'))
+  t.after(() => fs.rm(dir, { recursive: true, force: true }))
+  const filePath = path.join(dir, 'original.jpg')
+  // Three hypercore blocks (64 KiB each), so a partial blob is possible
+  await fs.writeFile(filePath, randomBytes(3 * 64 * 1024))
+
+  const blob = await project.$blobs.create(
+    {
+      original: filePath,
+      preview: FIXTURE_IMAGE_PREVIEW_PATH,
+      thumbnail: FIXTURE_IMAGE_THUMBNAIL_PATH,
+    },
+    { mimeType: 'image/jpeg' },
+  )
+  const entry = await internals[kBlobStore].entry({
+    driveId: blob.driveId,
+    type: 'photo',
+    variant: 'original',
+    name: blob.name,
+  })
+  assert(entry, 'test setup: blob entry exists')
+  const { blockOffset, blockLength } = entry.value.blob
+  await internals[kCoreManager]
+    .getWriterCore('blob')
+    .core.clear(blockOffset + 1, blockOffset + blockLength)
+
+  return blob
 }
