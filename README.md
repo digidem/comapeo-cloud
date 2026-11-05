@@ -22,13 +22,15 @@ Or use the [`Dockerfile`](./Dockerfile) to build a Docker image.
 
 Server configuration is done using environment variables. The following environment variables are available:
 
-| Environment Variable  | Required | Description                                                          | Default Value    |
-| --------------------- | -------- | -------------------------------------------------------------------- | ---------------- |
-| `SERVER_BEARER_TOKEN` | Yes      | Token for authenticating API requests. Should be large random string |                  |
-| `PORT`                | No       | Port on which the server runs                                        | `8080`           |
-| `SERVER_NAME`         | No       | Friendly server name, seen by users when adding server               | `CoMapeo Server` |
-| `ALLOWED_PROJECTS`    | No       | Number of projects allowed to register with the server               | `1`              |
-| `STORAGE_DIR`         | No       | Path for storing app & project data                                  | `$CWD/data`      |
+| Environment Variable         | Required | Description                                                                                    | Default Value    |
+| ---------------------------- | -------- | ---------------------------------------------------------------------------------------------- | ---------------- |
+| `SERVER_BEARER_TOKEN`        | Yes      | Token for authenticating API requests. Should be large random string                           |                  |
+| `PORT`                       | No       | Port on which the server runs                                                                  | `8080`           |
+| `SERVER_NAME`                | No       | Friendly server name, seen by users when adding server                                         | `CoMapeo Server` |
+| `ALLOWED_PROJECTS`           | No       | Number of projects allowed to register with the server                                         | `1`              |
+| `STORAGE_DIR`                | No       | Path for storing app & project data                                                            | `$CWD/data`      |
+| `SYNC_HEARTBEAT_INTERVAL_MS` | No       | How often the server pings each sync websocket client                                          | `15000`          |
+| `SYNC_HEARTBEAT_TIMEOUT_MS`  | No       | Close a sync websocket that has sent no pong or data for this long (checked once per interval) | `30000`          |
 
 If you are using Nginx to act as a reverse proxy for your CoMapeo Cloud server, ensure your proxy headers are configured to support WebSockets.
 
