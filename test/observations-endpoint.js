@@ -8,6 +8,11 @@ import test from 'node:test'
 
 import {
   BEARER_TOKEN,
+  FIXTURE_AUDIO_PATH,
+  FIXTURE_IMAGE_ORIGINAL_PATH,
+  FIXTURE_IMAGE_PREVIEW_PATH,
+  FIXTURE_IMAGE_THUMBNAIL_PATH,
+  blobToAttachment,
   createTestServer,
   generateObservation,
   getManagerOptions,
@@ -18,15 +23,6 @@ import {
 
 /** @import { ObservationValue } from '@comapeo/core/schema.js'*/
 /** @import { FastifyInstance } from 'fastify' */
-
-const FIXTURES_ROOT = new URL('./fixtures/', import.meta.url)
-const FIXTURE_IMAGE_ORIGINAL_PATH = new URL('original.jpg', FIXTURES_ROOT)
-  .pathname
-const FIXTURE_IMAGE_PREVIEW_PATH = new URL('preview.jpg', FIXTURES_ROOT)
-  .pathname
-const FIXTURE_IMAGE_THUMBNAIL_PATH = new URL('thumbnail.jpg', FIXTURES_ROOT)
-  .pathname
-const FIXTURE_AUDIO_PATH = new URL('audio.mp3', FIXTURES_ROOT).pathname
 
 test('returns a 401 if no auth is provided', async (t) => {
   const server = createTestServer(t)
@@ -169,23 +165,6 @@ test('returning observations with fetchable attachments', async (t) => {
     }),
   )
 })
-
-/**
- * @param {object} blob
- * @param {string} blob.driveId
- * @param {'photo' | 'audio' | 'video'} blob.type
- * @param {string} blob.name
- * @param {string} blob.hash
- */
-function blobToAttachment(blob) {
-  return {
-    driveDiscoveryId: blob.driveId,
-    type: blob.type,
-    name: blob.name,
-    hash: blob.hash,
-    external: false,
-  }
-}
 
 /**
  * @param {object} options
