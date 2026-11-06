@@ -33,6 +33,13 @@ const schema = Type.Object({
       description: 'number of projects allowed to join the server',
     }),
   ),
+  SYNC_INACTIVITY_TIMEOUT_MS: Type.Optional(
+    Type.Integer({
+      minimum: 1,
+      description:
+        'close a sync websocket that has received nothing for this long',
+    }),
+  ),
 })
 
 /** @typedef {import('@sinclair/typebox').Static<typeof schema>} Env */
@@ -85,6 +92,7 @@ fastify.register(comapeoServer, {
   serverName: config.SERVER_NAME,
   serverBearerToken: config.SERVER_BEARER_TOKEN,
   allowedProjects: config.ALLOWED_PROJECTS,
+  syncInactivityTimeoutMs: config.SYNC_INACTIVITY_TIMEOUT_MS,
   rootKey,
   coreStorage,
   dbFolder,
