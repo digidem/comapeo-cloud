@@ -4,6 +4,7 @@ import { WebSocket } from 'ws'
 import assert from 'node:assert/strict'
 import { once } from 'node:events'
 import test from 'node:test'
+import { setTimeout as delay } from 'node:timers/promises'
 
 import { createTestServer, randomAddProjectBody } from './test-helpers.js'
 
@@ -56,11 +57,9 @@ test('sync endpoint returns error with an invalid project public ID', async (t) 
   assert.equal(response.json().error.code, 'BAD_REQUEST')
 })
 
-test('sync endpoint closes a client that stops answering pings', async (t) => {
-  const server = createTestServer(t, {
-    syncHeartbeatIntervalMs: 100,
-    syncHeartbeatTimeoutMs: 300,
-  })
+test('sync endpoint closes a client that goes silent', async (t) => {
+  const timeoutMs = 300
+  const server = createTestServer(t, { syncInactivityTimeoutMs: timeoutMs })
   const addProjectBody = randomAddProjectBody()
   const projectPublicId = projectKeyToPublicId(
     Buffer.from(addProjectBody.projectKey, 'hex'),
@@ -70,15 +69,20 @@ test('sync endpoint closes a client that stops answering pings', async (t) => {
   const serverAddress = await server.listen()
   const url = serverAddress.replace(/^http/u, 'ws') + '/sync/' + projectPublicId
 
-  // @ts-expect-error autoPong (ws >= 8.15) is missing from @types/ws
-  const deadClient = new WebSocket(url, { autoPong: false })
-  const liveClient = new WebSocket(url)
+  const silentClient = new WebSocket(url)
+  const chattyClient = new WebSocket(url)
   t.after(() => {
-    deadClient.terminate()
-    liveClient.terminate()
+    silentClient.terminate()
+    chattyClient.terminate()
   })
-  await Promise.all([once(deadClient, 'open'), once(liveClient, 'open')])
+  await Promise.all([once(silentClient, 'open'), once(chattyClient, 'open')])
 
-  await once(deadClient, 'close', { signal: AbortSignal.timeout(3000) })
-  assert.equal(liveClient.readyState, WebSocket.OPEN, 'live client stays open')
+  // Empty frames count as inbound messages but never reach the replication
+  // stream, so the noise handshake does not fail on junk
+  const sender = setInterval(() => chattyClient.send(Buffer.alloc(0)), 50)
+  t.after(() => clearInterval(sender))
+
+  await once(silentClient, 'close', { signal: AbortSignal.timeout(3000) })
+  await delay(timeoutMs * 2)
+  assert.equal(chattyClient.readyState, WebSocket.OPEN)
 })
