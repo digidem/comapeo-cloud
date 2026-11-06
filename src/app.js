@@ -29,8 +29,7 @@ async function comapeoServer(
     serverName,
     allowedHosts,
     allowedProjects,
-    syncHeartbeatIntervalMs,
-    syncHeartbeatTimeoutMs,
+    syncInactivityTimeoutMs,
     ...comapeoPluginOpts
   },
 ) {
@@ -43,8 +42,7 @@ async function comapeoServer(
     serverBearerToken,
     serverName,
     allowedProjects,
-    syncHeartbeatIntervalMs,
-    syncHeartbeatTimeoutMs,
+    syncInactivityTimeoutMs,
   })
 }
 

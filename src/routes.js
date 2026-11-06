@@ -45,8 +45,7 @@ const SUPPORTED_ATTACHMENT_TYPES = new Set(
  * @prop {string} serverBearerToken
  * @prop {string} serverName
  * @prop {undefined | number | string[]} [allowedProjects=1]
- * @prop {number} [syncHeartbeatIntervalMs=15000]
- * @prop {number} [syncHeartbeatTimeoutMs=30000]
+ * @prop {number} [syncInactivityTimeoutMs=30000]
  */
 
 /** @type {FastifyPluginAsync<RouteOptions, RawServerDefault, TypeBoxTypeProvider>} */
@@ -56,15 +55,9 @@ export default async function routes(
     serverBearerToken,
     serverName,
     allowedProjects = 1,
-    syncHeartbeatIntervalMs = 15_000,
-    syncHeartbeatTimeoutMs = 30_000,
+    syncInactivityTimeoutMs = 30_000,
   },
 ) {
-  if (syncHeartbeatTimeoutMs <= syncHeartbeatIntervalMs) {
-    throw new Error(
-      'syncHeartbeatTimeoutMs must be greater than syncHeartbeatIntervalMs',
-    )
-  }
   /** @type {Set<string> | number} */
   const allowedProjectsSetOrNumber = Array.isArray(allowedProjects)
     ? new Set(allowedProjects)
@@ -290,11 +283,12 @@ export default async function routes(
       // The preValidation hook ensures that the project exists
       const project = await this.comapeo.getProject(req.params.projectPublicId)
       const replicationStream = replicateProject(project, false)
-      startHeartbeat(socket, {
-        intervalMs: syncHeartbeatIntervalMs,
-        timeoutMs: syncHeartbeatTimeoutMs,
-        onTimeout: () => req.log.warn('sync websocket heartbeat timed out'),
-      })
+      terminateWhenSilent(socket, syncInactivityTimeoutMs, () =>
+        req.log.warn(
+          'sync websocket received nothing for %d ms, terminating',
+          syncInactivityTimeoutMs,
+        ),
+      )
       wsCoreReplicator(socket, replicationStream)
       project.$sync.start()
     },
@@ -714,31 +708,20 @@ function setAttachmentURL(obs, params) {
 }
 
 /**
- * A phone that drops off the network sends no FIN, so without this the socket
- * stays open until TCP retransmits give up (minutes).
+ * No ping needed: hypercore sets a 5 s keepalive on every replication stream,
+ * so a live client is never silent this long.
  *
  * @param {import('ws').WebSocket} socket
- * @param {{ intervalMs: number, timeoutMs: number, onTimeout: () => void }} options
+ * @param {number} timeoutMs
+ * @param {() => void} onTimeout
  */
-function startHeartbeat(socket, { intervalMs, timeoutMs, onTimeout }) {
-  let lastSeen = Date.now()
-  const markAlive = () => {
-    lastSeen = Date.now()
-  }
-  socket.on('pong', markAlive)
-  socket.on('message', markAlive)
-  const timer = setInterval(() => {
-    if (socket.readyState !== socket.OPEN) {
-      clearInterval(timer)
-    } else if (Date.now() - lastSeen > timeoutMs) {
-      clearInterval(timer)
-      onTimeout()
-      socket.terminate()
-    } else {
-      socket.ping()
-    }
-  }, intervalMs)
-  socket.once('close', () => clearInterval(timer))
+function terminateWhenSilent(socket, timeoutMs, onTimeout) {
+  const timer = setTimeout(() => {
+    onTimeout()
+    socket.terminate()
+  }, timeoutMs).unref()
+  socket.on('message', () => timer.refresh())
+  socket.once('close', () => clearTimeout(timer))
 }
 
 /**
