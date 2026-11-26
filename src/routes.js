@@ -301,7 +301,10 @@ export default async function routes(
           syncInactivityTimeoutMs,
         ),
       )
-      wsCoreReplicator(socket, replicationStream)
+      wsCoreReplicator(socket, replicationStream).catch((err) => {
+        req.log.warn({ err }, 'sync websocket replication failed')
+        socket.terminate()
+      })
       project.$sync.start()
     },
   )

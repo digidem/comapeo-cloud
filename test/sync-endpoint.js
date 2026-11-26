@@ -2,9 +2,13 @@ import { keyToPublicId as projectKeyToPublicId } from '@mapeo/crypto'
 import { WebSocket } from 'ws'
 
 import assert from 'node:assert/strict'
+import { randomBytes } from 'node:crypto'
 import { once } from 'node:events'
 import test from 'node:test'
-import { setTimeout as delay } from 'node:timers/promises'
+import {
+  setImmediate as nextLoop,
+  setTimeout as delay
+} from 'node:timers/promises'
 
 import { createTestServer, randomAddProjectBody } from './test-helpers.js'
 
@@ -57,6 +61,35 @@ test('sync endpoint returns error with an invalid project public ID', async (t) 
   assert.equal(response.json().error.code, 'BAD_REQUEST')
 })
 
+test('server survives a sync client sending garbage instead of a handshake', async (t) => {
+  const server = createTestServer(t)
+  const addProjectBody = randomAddProjectBody()
+  const projectPublicId = projectKeyToPublicId(
+    Buffer.from(addProjectBody.projectKey, 'hex'),
+  )
+  await server.inject({ method: 'PUT', url: '/projects', body: addProjectBody })
+    /** @type {unknown[]} */
+  const unhandledRejections = []
+  /** @param {unknown} err */
+  const onUnhandledRejection = (err) => unhandledRejections.push(err)
+  process.on('unhandledRejection', onUnhandledRejection)
+  t.after(() => process.off('unhandledRejection', onUnhandledRejection))
+
+  const ws = await server.injectWS('/sync/' + projectPublicId)
+  // 3-byte frame length prefix followed by a garbage handshake message. An
+  // unframed payload would just be buffered while the server waits for more.
+  const garbage = Buffer.concat([Buffer.from([64, 0, 0]), randomBytes(64)])
+  // The handler drops frames that arrive before it has attached the pipeline.
+  const sending = setInterval(() => ws.send(garbage), 10)
+  await once(ws, 'close')
+  clearInterval(sending)
+  await nextLoop()
+
+  assert.deepEqual(unhandledRejections, [])
+  const response = await server.inject({ method: 'GET', url: '/info' })
+  assert.equal(response.statusCode, 200)
+})
+
 test('sync endpoint closes a client that goes silent', async (t) => {
   const timeoutMs = 300
   const server = createTestServer(t, { syncInactivityTimeoutMs: timeoutMs })
@@ -65,7 +98,7 @@ test('sync endpoint closes a client that goes silent', async (t) => {
     Buffer.from(addProjectBody.projectKey, 'hex'),
   )
   await server.inject({ method: 'PUT', url: '/projects', body: addProjectBody })
-
+  
   const serverAddress = await server.listen()
   const url = serverAddress.replace(/^http/u, 'ws') + '/sync/' + projectPublicId
 
