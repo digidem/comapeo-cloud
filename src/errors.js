@@ -46,6 +46,13 @@ export const projectNotFoundError = () =>
 export const iconNotFoundErrror = () =>
   new HttpError(404, 'ICON_NOT_FOUND', 'Icon not found')
 
+export const attachmentUpstreamUnavailableError = () =>
+  new HttpError(
+    502,
+    'ATTACHMENT_UPSTREAM_UNAVAILABLE',
+    'Could not read attachment; it may not be fully synced to this server yet',
+  )
+
 /** @param {never} value */
 export const shouldBeImpossibleError = (value) =>
   new Error(`${value} should be impossible`)
