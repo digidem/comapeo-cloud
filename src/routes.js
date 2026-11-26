@@ -40,17 +40,35 @@ const SUPPORTED_ATTACHMENT_TYPES = new Set(
   /** @type {const} */ (['photo', 'audio']),
 )
 
+// Headers that describe the upstream connection, not the attachment (RFC 9110 7.6.1)
+const HOP_BY_HOP_HEADERS = new Set([
+  'connection',
+  'keep-alive',
+  'proxy-authenticate',
+  'proxy-authorization',
+  'te',
+  'trailer',
+  'transfer-encoding',
+  'upgrade',
+])
+
 /**
  * @typedef {object} RouteOptions
  * @prop {string} serverBearerToken
  * @prop {string} serverName
  * @prop {undefined | number | string[]} [allowedProjects=1]
+ * @prop {number} [syncInactivityTimeoutMs=30000]
  */
 
 /** @type {FastifyPluginAsync<RouteOptions, RawServerDefault, TypeBoxTypeProvider>} */
 export default async function routes(
   fastify,
-  { serverBearerToken, serverName, allowedProjects = 1 },
+  {
+    serverBearerToken,
+    serverName,
+    allowedProjects = 1,
+    syncInactivityTimeoutMs = 30_000,
+  },
 ) {
   /** @type {Set<string> | number} */
   const allowedProjectsSetOrNumber = Array.isArray(allowedProjects)
@@ -277,6 +295,12 @@ export default async function routes(
       // The preValidation hook ensures that the project exists
       const project = await this.comapeo.getProject(req.params.projectPublicId)
       const replicationStream = replicateProject(project, false)
+      terminateWhenSilent(socket, syncInactivityTimeoutMs, () =>
+        req.log.warn(
+          'sync websocket received nothing for %d ms, terminating',
+          syncInactivityTimeoutMs,
+        ),
+      )
       wsCoreReplicator(socket, replicationStream).catch((err) => {
         req.log.warn({ err }, 'sync websocket replication failed')
         socket.terminate()
@@ -521,9 +545,17 @@ export default async function routes(
         ...typeAndVariant,
       })
 
-      const proxiedResponse = await fetch(blobUrl)
+      let proxiedResponse
+      try {
+        proxiedResponse = await fetch(blobUrl)
+      } catch (err) {
+        // Core's blob server resets the socket when a blob's early blocks are missing
+        req.log.warn({ err }, 'attachment blob fetch failed')
+        throw errors.attachmentUpstreamUnavailableError()
+      }
       reply.code(proxiedResponse.status)
       for (const [headerName, headerValue] of proxiedResponse.headers) {
+        if (HOP_BY_HOP_HEADERS.has(headerName)) continue
         reply.header(headerName, headerValue)
       }
       return reply.send(proxiedResponse.body)
@@ -696,6 +728,23 @@ function setAttachmentURL(obs, params) {
       })),
     presetRef: expandRef(obs.presetRef, 'preset', params),
   }
+}
+
+/**
+ * No ping needed: hypercore sets a 5 s keepalive on every replication stream,
+ * so a live client is never silent this long.
+ *
+ * @param {import('ws').WebSocket} socket
+ * @param {number} timeoutMs
+ * @param {() => void} onTimeout
+ */
+function terminateWhenSilent(socket, timeoutMs, onTimeout) {
+  const timer = setTimeout(() => {
+    onTimeout()
+    socket.terminate()
+  }, timeoutMs).unref()
+  socket.on('message', () => timer.refresh())
+  socket.once('close', () => clearTimeout(timer))
 }
 
 /**

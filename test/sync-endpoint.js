@@ -1,10 +1,14 @@
 import { keyToPublicId as projectKeyToPublicId } from '@mapeo/crypto'
+import { WebSocket } from 'ws'
 
 import assert from 'node:assert/strict'
 import { randomBytes } from 'node:crypto'
 import { once } from 'node:events'
 import test from 'node:test'
-import { setImmediate as nextLoop } from 'node:timers/promises'
+import {
+  setImmediate as nextLoop,
+  setTimeout as delay
+} from 'node:timers/promises'
 
 import { createTestServer, randomAddProjectBody } from './test-helpers.js'
 
@@ -64,8 +68,7 @@ test('server survives a sync client sending garbage instead of a handshake', asy
     Buffer.from(addProjectBody.projectKey, 'hex'),
   )
   await server.inject({ method: 'PUT', url: '/projects', body: addProjectBody })
-
-  /** @type {unknown[]} */
+    /** @type {unknown[]} */
   const unhandledRejections = []
   /** @param {unknown} err */
   const onUnhandledRejection = (err) => unhandledRejections.push(err)
@@ -85,4 +88,34 @@ test('server survives a sync client sending garbage instead of a handshake', asy
   assert.deepEqual(unhandledRejections, [])
   const response = await server.inject({ method: 'GET', url: '/info' })
   assert.equal(response.statusCode, 200)
+})
+
+test('sync endpoint closes a client that goes silent', async (t) => {
+  const timeoutMs = 300
+  const server = createTestServer(t, { syncInactivityTimeoutMs: timeoutMs })
+  const addProjectBody = randomAddProjectBody()
+  const projectPublicId = projectKeyToPublicId(
+    Buffer.from(addProjectBody.projectKey, 'hex'),
+  )
+  await server.inject({ method: 'PUT', url: '/projects', body: addProjectBody })
+  
+  const serverAddress = await server.listen()
+  const url = serverAddress.replace(/^http/u, 'ws') + '/sync/' + projectPublicId
+
+  const silentClient = new WebSocket(url)
+  const chattyClient = new WebSocket(url)
+  t.after(() => {
+    silentClient.terminate()
+    chattyClient.terminate()
+  })
+  await Promise.all([once(silentClient, 'open'), once(chattyClient, 'open')])
+
+  // Empty frames count as inbound messages but never reach the replication
+  // stream, so the noise handshake does not fail on junk
+  const sender = setInterval(() => chattyClient.send(Buffer.alloc(0)), 50)
+  t.after(() => clearInterval(sender))
+
+  await once(silentClient, 'close', { signal: AbortSignal.timeout(3000) })
+  await delay(timeoutMs * 2)
+  assert.equal(chattyClient.readyState, WebSocket.OPEN)
 })
